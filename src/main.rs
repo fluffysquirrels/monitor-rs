@@ -1,10 +1,16 @@
 #[macro_use]
 extern crate log;
 
+mod metric_store;
+mod notifier;
 mod scheduler;
 mod signal;
 
-use crate::signal::Signal;
+use crate::{
+    metric_store::{Metric, MetricStore},
+    notifier::Notifier,
+    signal::Signal,
+};
 use gio::prelude::*;
 use gtk::prelude::*;
 use rt_graph;
@@ -61,8 +67,8 @@ fn main() {
         .update_signal()
         .connect(move |m|
                  {
-                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest {
-                         nc.lock().unwrap().update_metric(&m.name, ok);
+                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
+                         nc.lock().unwrap().update_metric(m.name(), *ok);
                      }
                  });
     sched.spawn();
@@ -98,14 +104,14 @@ fn build_ui(application: &gtk::Application, ms: Arc<Mutex<MetricStore>>) {
         .build();
     window.add(&graphs);
 
-    graph_for_metric(&ms, &graphs, &gdk_window, "ping.mf");
-    graph_for_metric(&ms, &graphs, &gdk_window, "apt.upgradable");
-    graph_for_metric(&ms, &graphs, &gdk_window, "mf.apt.upgradable");
+    ui_for_metric(&ms, &graphs, &gdk_window, "ping.mf");
+    ui_for_metric(&ms, &graphs, &gdk_window, "apt.upgradable");
+    ui_for_metric(&ms, &graphs, &gdk_window, "mf.apt.upgradable");
 
     window.show_all();
 }
 
-fn graph_for_metric<C>(
+fn ui_for_metric<C>(
     ms: &Arc<Mutex<MetricStore>>,
     graphs: &C,
     gdk_window: &gdk::Window,
@@ -152,7 +158,7 @@ impl rt_graph::DataSource for MetricStoreDataSource {
             m.iter()
              .map(|m| rt_graph::Point {
                  t: self.t, // TODO: Use time.
-                 vs: vec![match m.latest {
+                 vs: vec![match m.latest() {
                      Some(DataPoint { val: MetricValue::OkErr(ok), .. }) =>
                          match ok {
                              OkErr::Ok => 50000,
@@ -235,124 +241,14 @@ pub enum OkErr {
 }
 
 #[derive(Clone, Debug)]
-enum MetricValue {
+pub enum MetricValue {
     OkErr(OkErr),
     _I64(i64),
     _F64(f64),
 }
 
 #[derive(Clone, Debug)]
-struct DataPoint {
+pub struct DataPoint {
     time: chrono::DateTime<chrono::Utc>,
     val: MetricValue,
-}
-
-#[derive(Clone, Debug)]
-struct Metric {
-    latest: Option<DataPoint>,
-    name: String,
-}
-
-struct MetricStore {
-    metrics: Vec<Metric>,
-    update_signal: Signal<Metric>,
-}
-
-impl MetricStore {
-    pub fn new() -> MetricStore {
-        MetricStore {
-            metrics: vec![],
-            update_signal: Signal::new(),
-        }
-    }
-
-    pub fn update(&mut self, metric_name: &str, point: DataPoint) {
-        let existing = self.metrics.iter_mut().find(|m| m.name == metric_name);
-        let metric: &mut Metric = match existing {
-            Some(e) => e,
-            None => {
-                self.metrics.push(Metric {
-                    name: metric_name.to_owned(),
-                    latest: None,
-                });
-                self.metrics.last_mut().unwrap()
-            }
-        };
-        metric.latest = Some(point);
-        self.update_signal.raise(metric.clone());
-    }
-
-    pub fn update_signal(&mut self) -> &mut Signal<Metric> {
-        &mut self.update_signal
-    }
-
-    pub fn query_one(&self, metric_name: &str) -> Option<Metric> {
-        self.metrics.iter()
-                    .find(|m| m.name == metric_name)
-                    .cloned()
-    }
-
-    pub fn query_all(&self) -> Vec<Metric> {
-        self.metrics.iter().cloned().collect()
-    }
-}
-
-pub struct Notifier {
-    metrics: Vec<NotifierMetric>,
-}
-
-struct NotifierMetric {
-    name: String,
-    last_value: OkErr,
-    last_notification: Option<chrono::DateTime<chrono::Utc>>,
-}
-
-const NOTIFICATION_REFRESH_SECS: i64 = 5 * 60; // 5 minutes
-
-impl Notifier {
-    pub fn new() -> Notifier {
-        Notifier {
-            metrics: vec![],
-        }
-    }
-
-    pub fn update_metric(&mut self, name: &str, new_value: OkErr) {
-        let existing = self.metrics.iter_mut().find(|m| m.name == name);
-        let metric: &mut NotifierMetric = match existing {
-            Some(m) => m,
-            None => {
-                self.metrics.push(NotifierMetric {
-                    name: name.to_owned(),
-                    last_value: OkErr::Ok,
-                    last_notification: None,
-                });
-                self.metrics.last_mut().unwrap()
-            }
-        };
-        let last_value = metric.last_value;
-        metric.last_value = new_value;
-
-        let is_changed = last_value != new_value;
-        let is_old = metric.last_notification.is_none()
-            || ((chrono::Utc::now() - metric.last_notification.unwrap()) >
-                chrono::Duration::seconds(NOTIFICATION_REFRESH_SECS));
-        let is_old_error = (last_value == OkErr::Err) && is_old;
-        if is_changed || is_old_error {
-            trace!("Notifier: is_changed={} is_old_error={}", is_changed, is_old_error);
-            let res = notify_rust::Notification::new()
-                .summary("monitor")
-                .body(&format!("metric `{}` is {:?}", metric.name, metric.last_value))
-                .timeout(notify_rust::Timeout::Milliseconds(2000))
-                .show();
-            metric.last_notification = Some(chrono::Utc::now());
-            if let Err(e) = res {
-                error!("Showing notification: {}", e);
-            }
-
-            // TODO: Close after n seconds. NB: NotificationHandle is !Send.
-
-            // std::thread::sleep(std::time::Duration::from_secs(5));
-            // nh.close();
-        }
-    }
 }
