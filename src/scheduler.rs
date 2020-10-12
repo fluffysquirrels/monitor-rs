@@ -10,6 +10,20 @@ pub struct Scheduler {
     job_thread: Option<thread::JoinHandle<()>>,
 }
 
+pub struct JobDefinition {
+    pub f: Arc<Mutex<dyn (Fn(RunContext)) + Send + 'static>>,
+    pub interval: chrono::Duration,
+    pub name: String,
+}
+
+struct JobState {
+    def: JobDefinition,
+    last_finish: chrono::DateTime<chrono::Utc>,
+    force_run: bool,
+}
+
+pub struct RunContext {}
+
 impl Scheduler {
     pub fn new() -> Scheduler {
         Scheduler {
@@ -22,7 +36,16 @@ impl Scheduler {
         self.states.lock().unwrap().push(JobState {
             def,
             last_finish: chrono::Utc.yo(1970, 1).and_hms(0,0,0),
+            force_run: false,
         });
+    }
+
+    pub fn force_run(&mut self, job_name: &str) {
+        let mut states = self.states.lock().unwrap();
+        let j = states
+                    .iter_mut().find(|j| j.def.name == job_name)
+                    .expect("To find the job");
+        j.force_run = true;
     }
 
     pub fn spawn(&mut self) {
@@ -33,7 +56,7 @@ impl Scheduler {
                 .spawn(move || {
                     Self::run(sc)
                 }).unwrap()
-                );
+        );
     }
 
     //         pub fn join(&mut self) {
@@ -49,9 +72,12 @@ impl Scheduler {
         loop {
             {
                 for s in states.lock().unwrap().iter_mut() {
-                    if s.last_finish + s.def.interval < chrono::Utc::now() {
+                    if (s.last_finish + s.def.interval < chrono::Utc::now())
+                        || s.force_run
+                    {
                         (s.def.f.lock().unwrap())(RunContext {});
                         s.last_finish = chrono::Utc::now();
+                        s.force_run = false;
                     }
                 }
             }
@@ -59,16 +85,3 @@ impl Scheduler {
         }
     }
 }
-
-pub struct JobDefinition {
-    pub f: Arc<Mutex<dyn (Fn(RunContext)) + Send + 'static>>,
-    pub interval: chrono::Duration,
-    pub name: String,
-}
-
-struct JobState {
-    def: JobDefinition,
-    last_finish: chrono::DateTime<chrono::Utc>,
-}
-
-pub struct RunContext {}

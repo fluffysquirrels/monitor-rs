@@ -9,6 +9,7 @@ mod signal;
 use crate::{
     metric_store::{Metric, MetricStore},
     notifier::Notifier,
+    scheduler::Scheduler,
     signal::Signal,
 };
 use gio::prelude::*;
@@ -34,34 +35,39 @@ fn main() {
 
     let ms = Arc::new(Mutex::new(MetricStore::new()));
     let n = Arc::new(Mutex::new(Notifier::new()));
-    let mut sched = scheduler::Scheduler::new();
+    let sched = Arc::new(Mutex::new(Scheduler::new()));
 
-    sched.add(shell_check_job("ping.mf",
-                              "ping -c 1 -W 5 mf",
-                              chrono::Duration::seconds(5),
-                              ms.clone()));
+    {
+        let mut sched = sched.lock().unwrap();
+        sched.add(shell_check_job("ping.mf",
+                                  "ping -c 1 -W 5 mf",
+                                  chrono::Duration::seconds(5),
+                                  ms.clone()));
 
-    sched.add(shell_check_job("apt.upgradable",
-                              "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
-                              chrono::Duration::seconds(600),
-                              ms.clone()));
+        sched.add(shell_check_job("apt.upgradable",
+                                  "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
+                                  chrono::Duration::seconds(600),
+                                  ms.clone()));
 
-    sched.add(shell_check_job("mf.apt.upgradable",
-                              "ssh mf /home/alex/Code/apt-upgradable.py",
-                              chrono::Duration::seconds(600),
-                              ms.clone()));
+        sched.add(shell_check_job("mf.apt.upgradable",
+                                  "ssh mf /home/alex/Code/apt-upgradable.py",
+                                  chrono::Duration::seconds(600),
+                                  ms.clone()));
 
-    let msc = ms.clone();
-    sched.add(scheduler::JobDefinition {
-        f: Arc::new(Mutex::new(move |_rc| {
-            for m in msc.lock().unwrap().query_all() {
-                debug!("{:?}", m);
-            }
-        })),
-        interval: chrono::Duration::seconds(5),
-        name: String::from("show-metrics"),
-    });
+        let msc = ms.clone();
+        sched.add(scheduler::JobDefinition {
+            f: Arc::new(Mutex::new(move |_rc| {
+                for m in msc.lock().unwrap().query_all() {
+                    debug!("{:?}", m);
+                }
+            })),
+            interval: chrono::Duration::seconds(5),
+            name: String::from("show-metrics"),
+        });
 
+        sched.spawn();
+    }
+    // Listen to metrics and connect the Notifier.
     let nc = n.clone();
     ms.lock().unwrap()
         .update_signal()
@@ -71,7 +77,6 @@ fn main() {
                          nc.lock().unwrap().update_metric(m.name(), *ok);
                      }
                  });
-    sched.spawn();
 
     let application =
         gtk::Application::new(Some("com.github.fluffysquirrels.monitor"),
@@ -79,15 +84,21 @@ fn main() {
             .expect("Application::new failed");
 
     let msc = ms.clone();
+    let sc = sched.clone();
     application.connect_activate(move |app| {
         let ms = msc.clone();
-        build_ui(app, ms);
+        let sc = sc.clone();
+        build_ui(app, ms, sc);
     });
 
     application.run(&args().collect::<Vec<_>>());
 }
 
-fn build_ui(application: &gtk::Application, ms: Arc<Mutex<MetricStore>>) {
+fn build_ui(
+    application: &gtk::Application,
+    ms: Arc<Mutex<MetricStore>>,
+    sched: Arc<Mutex<Scheduler>>,
+) {
     let window = gtk::ApplicationWindowBuilder::new()
         .application(application)
         .title("monitor")
@@ -104,15 +115,16 @@ fn build_ui(application: &gtk::Application, ms: Arc<Mutex<MetricStore>>) {
         .build();
     window.add(&graphs);
 
-    ui_for_metric(&ms, &graphs, &gdk_window, "ping.mf");
-    ui_for_metric(&ms, &graphs, &gdk_window, "apt.upgradable");
-    ui_for_metric(&ms, &graphs, &gdk_window, "mf.apt.upgradable");
+    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "ping.mf");
+    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "apt.upgradable");
+    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "mf.apt.upgradable");
 
     window.show_all();
 }
 
 fn ui_for_metric<C>(
     ms: &Arc<Mutex<MetricStore>>,
+    sched: &Arc<Mutex<Scheduler>>,
     graphs: &C,
     gdk_window: &gdk::Window,
     metric_name: &str
@@ -123,6 +135,18 @@ fn ui_for_metric<C>(
         .label(metric_name)
         .parent(graphs)
         .build();
+
+    let force_btn = gtk::ButtonBuilder::new()
+        .label("Force")
+        .parent(graphs)
+        .halign(gtk::Align::Start)
+        .build();
+    let sched = sched.clone();
+    let metric_name_clone = metric_name.to_owned();
+    force_btn.connect_clicked(move |_btn| {
+        sched.lock().unwrap().force_run(&metric_name_clone);
+    });
+
     let config = rt_graph::ConfigBuilder::default()
         .data_source(MetricStoreDataSource {
             metric_name: String::from(metric_name),
@@ -190,6 +214,7 @@ fn shell_check_job(
     scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
             let res = shell_check(subprocess::Exec::shell(&cmd));
+            debug!("shell_check cmd={} log=\n{}", &cmd, res.log);
             ms.lock().unwrap().update(&name2, DataPoint {
                 time: chrono::Utc::now(),
                 val: MetricValue::OkErr(res.ok)
@@ -230,7 +255,6 @@ fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
             _ => OkErr::Err,
         },
     };
-    debug!("shell_check res={:#?}", res);
     res
 }
 

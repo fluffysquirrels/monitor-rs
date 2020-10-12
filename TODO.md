@@ -14,7 +14,6 @@
 ## Features
 
 * Other metric types than `OkErr`.
-* Button to force scheduler to run a task.
 * Way to view a shell check log.
 * View just failing checks.
 
