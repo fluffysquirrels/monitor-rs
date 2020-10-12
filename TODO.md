@@ -1,0 +1,27 @@
+# TODO
+
+## Bugs
+
+* `shell_check` has no timeout
+* `connect: Network is unreachable` in console from `ping.mf` when wi-fi disconnected.
+* `MetricStoreDataSource` should use time for `Point.t`.
+* `MetricStoreDataSource` Only return points when they're new.
+* High CPU usage when not minimised
+* `Notifier` should call `NotificationHandle.close()` to avoid
+  consuming all the notification slots.
+
+## Features
+
+* Other metric types than `OkErr`.
+* Button to force scheduler to run a task.
+* Way to view a shell check log.
+
+## Improvements
+
+* No way to terminate a Scheduler
+* Scheduler shouldn't lock so much / so long
+* MetricStore should probably store a BTreeMap of metrics.
+
+## Questions
+
+* `Arc<Mutex<State>>` external or internal.
