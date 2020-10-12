@@ -6,15 +6,17 @@
 * `connect: Network is unreachable` in console from `ping.mf` when wi-fi disconnected.
 * `MetricStoreDataSource` should use time for `Point.t`.
 * `MetricStoreDataSource` Only return points when they're new.
-* High CPU usage when not minimised
+* High CPU usage when not minimised (reduce FPS, show fewer graphs?)
 * `Notifier` should call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
+* Upload the repo somewhere as a backup.
 
 ## Features
 
 * Other metric types than `OkErr`.
 * Button to force scheduler to run a task.
 * Way to view a shell check log.
+* View just failing checks.
 
 ## Improvements
 
