@@ -233,15 +233,15 @@ struct ShellCheckResult {
 }
 
 fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
-    let res = cmd.capture().unwrap();
+    let res = cmd
+        .stdout(subprocess::Redirection::Pipe)
+        .stderr(subprocess::Redirection::Merge)
+        .capture().unwrap();
     let mut log = String::new();
-    log.push_str("stdout:\n=======\n");
+    log.push_str("stdout & stderr:\n=======\n");
     log.push_str(&*res.stdout_str());
     log.push_str("=======\n");
 
-    log.push_str("stderr:\n=======\n");
-    log.push_str(&*res.stderr_str());
-    log.push_str("=======\n");
     log.push_str(&format!("exit_status: {:?}", res.exit_status));
 
     let res = ShellCheckResult {
