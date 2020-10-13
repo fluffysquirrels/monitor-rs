@@ -16,12 +16,14 @@
 * Other metric types than `OkErr`.
 * Way to view a shell check log.
 * View just failing checks.
+* Web front end
 
 ## Improvements
 
 * No way to terminate a Scheduler
 * Scheduler shouldn't lock so much / so long
 * MetricStore should probably store a BTreeMap of metrics.
+* No feedback from "Force" button.
 
 ## Questions
 
