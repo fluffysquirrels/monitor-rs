@@ -19,7 +19,7 @@ pub struct JobDefinition {
 
 struct JobState {
     def: JobDefinition,
-    last_finish: chrono::DateTime<chrono::Utc>,
+    last_finish: Option<chrono::DateTime<chrono::Utc>>,
     force_run: bool,
 }
 
@@ -38,8 +38,7 @@ impl Scheduler {
             def.name.clone(),
             JobState {
                 def,
-                // Set initial last_finish to some time in the past.
-                last_finish: chrono::Utc.yo(1970, 1).and_hms(0,0,0),
+                last_finish: None,
                 force_run: false,
             });
     }
@@ -84,7 +83,8 @@ impl Scheduler {
             let to_run = states.lock().unwrap()
                 .values_mut()
                 .filter(|s| {
-                    (s.last_finish + s.def.interval < chrono::Utc::now())
+                    s.last_finish.is_none()
+                        || (s.last_finish.unwrap() + s.def.interval < chrono::Utc::now())
                         || s.force_run
                 }).map(|s| s.def.name.clone())
                 .collect::<Vec<String>>();
@@ -108,7 +108,7 @@ impl Scheduler {
                         Some(s) => s
                     };
 
-                    s.last_finish = chrono::Utc::now();
+                    s.last_finish = Some(chrono::Utc::now());
                     s.force_run = false;
                 }
             }
