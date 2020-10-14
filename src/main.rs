@@ -216,7 +216,7 @@ fn add_shell_check_job(
     let j = scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
             let res = shell_check(subprocess::Exec::shell(&cmd));
-            debug!("shell_check cmd={} log=\n{}", &cmd, res.log);
+            debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
             ms.lock().unwrap().update(&name2, DataPoint {
                 time: chrono::Utc::now(),
                 val: MetricValue::OkErr(res.ok)
@@ -234,19 +234,25 @@ struct ShellCheckResult {
     log: String,
     ok: OkErr,
     exit_code: Option<u32>,
+    duration: std::time::Duration,
 }
 
 fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
+    let start = std::time::Instant::now();
     let res = cmd
         .stdout(subprocess::Redirection::Pipe)
         .stderr(subprocess::Redirection::Merge)
         .capture().unwrap();
+    let end = std::time::Instant::now();
+    let duration: std::time::Duration = end - start;
+
     let mut log = String::new();
     log.push_str("stdout & stderr:\n=======\n");
     log.push_str(&*res.stdout_str());
     log.push_str("=======\n");
 
-    log.push_str(&format!("exit_status: {:?}", res.exit_status));
+    log.push_str(&format!("exit_status: {:?}\n", res.exit_status));
+    log.push_str(&format!("duration: {}ms", duration.as_millis()));
 
     let res = ShellCheckResult {
         log: log,
@@ -258,6 +264,7 @@ fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
             subprocess::ExitStatus::Exited(0) => OkErr::Ok,
             _ => OkErr::Err,
         },
+        duration,
     };
     res
 }
