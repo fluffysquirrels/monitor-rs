@@ -1,12 +1,13 @@
 use chrono::TimeZone;
 use std::{
+    collections::BTreeMap,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
 };
 
 pub struct Scheduler {
-    states: Arc<Mutex<Vec<JobState>>>,
+    states: Arc<Mutex<BTreeMap<String, JobState>>>,
     job_thread: Option<thread::JoinHandle<()>>,
 }
 
@@ -28,22 +29,25 @@ impl Scheduler {
     pub fn new() -> Scheduler {
         Scheduler {
             job_thread: None,
-            states: Arc::new(Mutex::new(vec![]))
+            states: Arc::new(Mutex::new(BTreeMap::new()))
         }
     }
 
     pub fn add(&mut self, def: JobDefinition) {
-        self.states.lock().unwrap().push(JobState {
-            def,
-            last_finish: chrono::Utc.yo(1970, 1).and_hms(0,0,0),
-            force_run: false,
-        });
+        self.states.lock().unwrap().insert(
+            def.name.clone(),
+            JobState {
+                def,
+                // Set initial last_finish to some time in the past.
+                last_finish: chrono::Utc.yo(1970, 1).and_hms(0,0,0),
+                force_run: false,
+            });
     }
 
     pub fn force_run(&mut self, job_name: &str) {
         let mut states = self.states.lock().unwrap();
         let j = states
-                    .iter_mut().find(|j| j.def.name == job_name)
+                    .get_mut(job_name)
                     .expect("To find the job");
         j.force_run = true;
     }
@@ -68,19 +72,48 @@ impl Scheduler {
 
     // TODO: Exit condition.
     // TODO: Don't lock the states for so long.
-    fn run(states: Arc<Mutex<Vec<JobState>>>) {
+    fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>) {
         loop {
-            {
-                for s in states.lock().unwrap().iter_mut() {
-                    if (s.last_finish + s.def.interval < chrono::Utc::now())
+            // The goal is to lock `states` for multiple short
+            // durations rather than one long duration (including the
+            // work function), which would potentially block the UI
+            // for a noticable period.
+
+            // First collect the names of the jobs that are eligible to run.
+            // TODO: This could use a heap.
+            let to_run = states.lock().unwrap()
+                .values_mut()
+                .filter(|s| {
+                    (s.last_finish + s.def.interval < chrono::Utc::now())
                         || s.force_run
-                    {
-                        (s.def.f.lock().unwrap())(RunContext {});
-                        s.last_finish = chrono::Utc::now();
-                        s.force_run = false;
-                    }
+                }).map(|s| s.def.name.clone())
+                .collect::<Vec<String>>();
+
+            // Then iterate through the jobs to run.
+            for name in to_run.iter() {
+                // Lock to get the job work function.
+                let f = match states.lock().unwrap().get(name) {
+                    // Didn't find the job, so it was removed, continue with the next job.
+                    None => continue,
+                    Some(s) => s.def.f.clone(),
+                };
+                // f runs without locking.
+                (f.lock().unwrap())(RunContext {});
+                {
+                    // Lock `states` to write the results.
+                    let mut states_lock = states.lock().unwrap();
+                    let mut s = match states_lock.get_mut(name) {
+                        // Didn't find the job, so it was removed, continue with the next job.
+                        None => continue,
+                        Some(s) => s
+                    };
+
+                    s.last_finish = chrono::Utc::now();
+                    s.force_run = false;
                 }
             }
+
+            // Wait a short period before evaluating the jobs again to check what to run.
             thread::sleep(Duration::from_secs(1));
         }
     }
