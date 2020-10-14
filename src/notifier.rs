@@ -1,7 +1,8 @@
 use crate::OkErr;
+use std::collections::BTreeMap;
 
 pub struct Notifier {
-    metrics: Vec<NotifierMetric>,
+    metrics: BTreeMap<String, NotifierMetric>,
 }
 
 struct NotifierMetric {
@@ -15,23 +16,18 @@ const NOTIFICATION_REFRESH_SECS: i64 = 5 * 60; // 5 minutes
 impl Notifier {
     pub fn new() -> Notifier {
         Notifier {
-            metrics: vec![],
+            metrics: BTreeMap::new(),
         }
     }
 
     pub fn update_metric(&mut self, name: &str, new_value: OkErr) {
-        let existing = self.metrics.iter_mut().find(|m| m.name == name);
-        let metric: &mut NotifierMetric = match existing {
-            Some(m) => m,
-            None => {
-                self.metrics.push(NotifierMetric {
+        let metric: &mut NotifierMetric =
+            self.metrics.entry(String::from(name))
+                .or_insert(NotifierMetric {
                     name: name.to_owned(),
                     last_value: OkErr::Ok,
                     last_notification: None,
                 });
-                self.metrics.last_mut().unwrap()
-            }
-        };
         let last_value = metric.last_value;
         metric.last_value = new_value;
 
