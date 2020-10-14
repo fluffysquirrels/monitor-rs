@@ -22,7 +22,7 @@
 
 * No way to terminate a Scheduler
 * Scheduler shouldn't lock so much / so long
-* MetricStore should probably store a BTreeMap of metrics.
+* `Scheduler`, `Notifier` should store data in a BTreeMap.
 * No feedback from "Force" button.
 
 ## Questions

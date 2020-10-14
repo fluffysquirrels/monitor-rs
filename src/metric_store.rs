@@ -2,6 +2,7 @@ use crate::{
     DataPoint,
     Signal,
 };
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
 pub struct Metric {
@@ -10,7 +11,7 @@ pub struct Metric {
 }
 
 pub struct MetricStore {
-    metrics: Vec<Metric>,
+    metrics: BTreeMap<String, Metric>,
     update_signal: Signal<Metric>,
 }
 
@@ -27,23 +28,18 @@ impl Metric {
 impl MetricStore {
     pub fn new() -> MetricStore {
         MetricStore {
-            metrics: vec![],
+            metrics: BTreeMap::new(),
             update_signal: Signal::new(),
         }
     }
 
     pub fn update(&mut self, metric_name: &str, point: DataPoint) {
-        let existing = self.metrics.iter_mut().find(|m| m.name == metric_name);
-        let metric: &mut Metric = match existing {
-            Some(e) => e,
-            None => {
-                self.metrics.push(Metric {
-                    name: metric_name.to_owned(),
-                    latest: None,
-                });
-                self.metrics.last_mut().unwrap()
-            }
-        };
+        let metric: &mut Metric =
+            self.metrics.entry(String::from(metric_name))
+                        .or_insert(Metric {
+                            name: metric_name.to_owned(),
+                            latest: None,
+                        });
         metric.latest = Some(point);
         self.update_signal.raise(metric.clone());
     }
@@ -53,12 +49,11 @@ impl MetricStore {
     }
 
     pub fn query_one(&self, metric_name: &str) -> Option<Metric> {
-        self.metrics.iter()
-                    .find(|m| m.name == metric_name)
+        self.metrics.get(metric_name)
                     .cloned()
     }
 
     pub fn query_all(&self) -> Vec<Metric> {
-        self.metrics.iter().cloned().collect()
+        self.metrics.values().cloned().collect()
     }
 }
