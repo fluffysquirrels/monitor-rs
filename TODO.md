@@ -21,9 +21,10 @@
 ## Improvements
 
 * No way to terminate a Scheduler
-* Scheduler shouldn't lock so much / so long
-* `Scheduler`, `Notifier` should store data in a BTreeMap.
-* No feedback from "Force" button.
+* No visual feedback from using "Force" button.
+* `Scheduler` could use a heap to calculate the next jobs in
+  `O(log n)` time, rather than iterating through all jobs frequently in `O(n)`
+  time.
 
 ## Questions
 

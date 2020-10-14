@@ -189,7 +189,7 @@ impl rt_graph::DataSource for MetricStoreDataSource {
                              OkErr::Ok => 50000,
                              OkErr::Err => 10000,
                          },
-                     // TODO.
+                     // TODO: Add other metric types.
                      _ => 0,
                  }],
              })
