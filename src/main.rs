@@ -37,36 +37,37 @@ fn main() {
     let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
-    {
-        let mut sched = sched.lock().unwrap();
-        sched.add(shell_check_job("ping.mf",
-                                  "ping -c 1 -W 5 mf",
-                                  chrono::Duration::seconds(5),
-                                  ms.clone()));
+    add_shell_check_job("ping.mf",
+                        "ping -c 1 -W 5 mf",
+                        chrono::Duration::seconds(5),
+                        ms.clone(),
+                        sched.clone());
 
-        sched.add(shell_check_job("apt.upgradable",
-                                  "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
-                                  chrono::Duration::seconds(600),
-                                  ms.clone()));
+    add_shell_check_job("apt.upgradable",
+                        "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
+                        chrono::Duration::seconds(600),
+                        ms.clone(),
+                        sched.clone());
 
-        sched.add(shell_check_job("mf.apt.upgradable",
-                                  "ssh mf /home/alex/Code/apt-upgradable.py",
-                                  chrono::Duration::seconds(600),
-                                  ms.clone()));
+    add_shell_check_job("mf.apt.upgradable",
+                        "ssh mf /home/alex/Code/apt-upgradable.py",
+                        chrono::Duration::seconds(600),
+                        ms.clone(),
+                        sched.clone());
 
-        let msc = ms.clone();
-        sched.add(scheduler::JobDefinition {
-            f: Arc::new(Mutex::new(move |_rc| {
-                for m in msc.lock().unwrap().query_all() {
-                    debug!("{:?}", m);
-                }
-            })),
-            interval: chrono::Duration::seconds(5),
-            name: String::from("show-metrics"),
-        });
+    let msc = ms.clone();
+    sched.lock().unwrap().add(scheduler::JobDefinition {
+        f: Arc::new(Mutex::new(move |_rc| {
+            for m in msc.lock().unwrap().query_all() {
+                debug!("{:?}", m);
+            }
+        })),
+        interval: chrono::Duration::seconds(5),
+        name: String::from("show-metrics"),
+    });
 
-        sched.spawn();
-    }
+    sched.lock().unwrap().spawn();
+
     // Listen to metrics and connect the Notifier.
     let nc = n.clone();
     ms.lock().unwrap()
@@ -203,15 +204,16 @@ impl rt_graph::DataSource for MetricStoreDataSource {
 
 }
 
-fn shell_check_job(
+fn add_shell_check_job(
     name: &str,
     cmd: &str,
     interval: chrono::Duration,
     ms: Arc<Mutex<MetricStore>>,
-) -> scheduler::JobDefinition {
+    sched: Arc<Mutex<Scheduler>>,
+) {
     let cmd = cmd.to_owned();
     let name2 = name.to_owned();
-    scheduler::JobDefinition {
+    let j = scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
             let res = shell_check(subprocess::Exec::shell(&cmd));
             debug!("shell_check cmd={} log=\n{}", &cmd, res.log);
@@ -222,7 +224,9 @@ fn shell_check_job(
         })),
         interval: interval,
         name: String::from(name),
-    }
+    };
+    sched.lock().unwrap()
+         .add(j);
 }
 
 #[derive(Clone, Debug)]
