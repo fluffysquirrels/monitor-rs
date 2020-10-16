@@ -27,6 +27,7 @@
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
+* Load metrics, checks from a config file, with hot reload. Maybe use RON or rudano?
 
 ## Questions
 
