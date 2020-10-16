@@ -1,59 +1,87 @@
 #[macro_use]
 extern crate log;
 
+mod log_store;
 mod metric_store;
 mod notifier;
 mod scheduler;
 mod signal;
 
 use crate::{
-    metric_store::{Metric, MetricStore},
+    log_store::{Log, LogStore},
+    metric_store::MetricStore,
     notifier::Notifier,
     scheduler::Scheduler,
     signal::Signal,
 };
 use gio::prelude::*;
+use glib;
 use gtk::prelude::*;
 use rt_graph;
 use subprocess;
 use std::{
+    collections::BTreeMap,
     env::args,
     sync::{Arc, Mutex},
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OkErr {
+    Ok,
+    Err,
+}
+
+#[derive(Clone, Debug)]
+pub enum MetricValue {
+    OkErr(OkErr),
+    _I64(i64),
+    _F64(f64),
+}
+
+#[derive(Clone, Debug)]
+pub struct DataPoint {
+    time: chrono::DateTime<chrono::Utc>,
+    val: MetricValue,
+}
+
+#[derive(Clone)]
+struct Ui {
+    metrics: BTreeMap<String, MetricUi>,
+}
+
+#[derive(Clone)]
+struct MetricUi {
+    label: gtk::Label,
+}
+
 fn main() {
     env_logger::init();
-
-    // let nh = notify_rust::Notification::new()
-    //     .summary("monitor")
-    //     .body("Starting!")
-    //     .timeout(notify_rust::Timeout::Milliseconds(2000))
-    //     .show().unwrap();
-    //
-    // std::thread::sleep(std::time::Duration::from_secs(5));
-    // nh.close();
 
     let ms = Arc::new(Mutex::new(MetricStore::new()));
     let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
+    let ls = Arc::new(Mutex::new(LogStore::new()));
 
     add_shell_check_job("ping.mf",
                         "ping -c 1 -W 5 mf",
                         chrono::Duration::seconds(5),
                         ms.clone(),
-                        sched.clone());
+                        sched.clone(),
+                        ls.clone());
 
     add_shell_check_job("apt.upgradable",
                         "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
                         chrono::Duration::seconds(600),
                         ms.clone(),
-                        sched.clone());
+                        sched.clone(),
+                        ls.clone());
 
     add_shell_check_job("mf.apt.upgradable",
                         "ssh mf /home/alex/Code/apt-upgradable.py",
                         chrono::Duration::seconds(600),
                         ms.clone(),
-                        sched.clone());
+                        sched.clone(),
+                        ls.clone());
 
     let msc = ms.clone();
     sched.lock().unwrap().add(scheduler::JobDefinition {
@@ -86,10 +114,12 @@ fn main() {
 
     let msc = ms.clone();
     let sc = sched.clone();
+    let lsc = ls.clone();
     application.connect_activate(move |app| {
         let ms = msc.clone();
         let sc = sc.clone();
-        build_ui(app, ms, sc);
+        let ls = lsc.clone();
+        build_ui(app, ms, sc, ls);
     });
 
     application.run(&args().collect::<Vec<_>>());
@@ -99,6 +129,7 @@ fn build_ui(
     application: &gtk::Application,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
+    ls: Arc<Mutex<LogStore>>,
 ) {
     let window = gtk::ApplicationWindowBuilder::new()
         .application(application)
@@ -116,23 +147,53 @@ fn build_ui(
         .build();
     window.add(&graphs);
 
-    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "ping.mf");
-    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "apt.upgradable");
-    ui_for_metric(&ms, &sched, &graphs, &gdk_window, "mf.apt.upgradable");
+    let metric_names = vec!["ping.mf", "apt.upgradable", "mf.apt.upgradable"];
+
+    let metrics = metric_names.iter().map(|name| {
+        let metric_ui = ui_for_metric(&ms, &sched, &ls, &graphs, &gdk_window, name);
+        (String::from(*name), metric_ui)
+    }).collect::<BTreeMap<String, MetricUi>>();
 
     window.show_all();
+
+    let ui = Ui {
+        metrics,
+    };
+
+    // Subscribe to log messages and send them over a channel to the UI thread,
+    // which can then update the UI.
+
+    let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
+
+    ls.lock().unwrap().update_signal().connect(move |log| {
+        match tx.send(log) {
+            Err(_) => error!("LogStore UI channel send error"),
+            Ok(_) => (),
+        }
+    });
+
+    let ui_thread = glib::MainContext::ref_thread_default();
+    let uic = ui.clone();
+    rx.attach(Some(&ui_thread), move |log| {
+        let metric = uic.metrics.get(&log.name);
+        if let Some(metric) = metric {
+            metric.label.set_tooltip_text(Some(&log.log));
+        }
+        glib::source::Continue(true)
+    });
 }
 
 fn ui_for_metric<C>(
     ms: &Arc<Mutex<MetricStore>>,
     sched: &Arc<Mutex<Scheduler>>,
+    _ls: &Arc<Mutex<LogStore>>,
     graphs: &C,
     gdk_window: &gdk::Window,
     metric_name: &str
-)
+) -> MetricUi
     where C: IsA<gtk::Container> + IsA<gtk::Widget>
 {
-    gtk::LabelBuilder::new()
+    let label = gtk::LabelBuilder::new()
         .label(metric_name)
         .parent(graphs)
         .build();
@@ -159,6 +220,10 @@ fn ui_for_metric<C>(
         .build()
         .unwrap();
     let mut _g = rt_graph::GraphWithControls::build_ui(config, graphs, &gdk_window);
+
+    MetricUi {
+        label,
+    }
 }
 
 struct MetricStoreDataSource {
@@ -210,16 +275,26 @@ fn add_shell_check_job(
     interval: chrono::Duration,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
+    ls: Arc<Mutex<LogStore>>,
 ) {
     let cmd = cmd.to_owned();
     let name2 = name.to_owned();
     let j = scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
+            let start = chrono::Utc::now();
             let res = shell_check(subprocess::Exec::shell(&cmd));
+            let finish = chrono::Utc::now();
+
             debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
             ms.lock().unwrap().update(&name2, DataPoint {
                 time: chrono::Utc::now(),
                 val: MetricValue::OkErr(res.ok)
+            });
+            ls.lock().unwrap().update(Log {
+                start, finish,
+                duration: res.duration,
+                log: res.log,
+                name: String::from(&name2),
             });
         })),
         interval: interval,
@@ -267,23 +342,4 @@ fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
         duration,
     };
     res
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum OkErr {
-    Ok,
-    Err,
-}
-
-#[derive(Clone, Debug)]
-pub enum MetricValue {
-    OkErr(OkErr),
-    _I64(i64),
-    _F64(f64),
-}
-
-#[derive(Clone, Debug)]
-pub struct DataPoint {
-    time: chrono::DateTime<chrono::Utc>,
-    val: MetricValue,
 }

@@ -14,7 +14,6 @@
 ## Features
 
 * Other metric types than `OkErr`.
-* Way to view a shell check log.
 * View just failing checks.
 * Web front end
 
