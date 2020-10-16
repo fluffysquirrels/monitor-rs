@@ -3,13 +3,8 @@
 ## Bugs
 
 * `shell_check` has no timeout
-* `connect: Network is unreachable` in console from `ping.mf` when wi-fi disconnected.
-* `MetricStoreDataSource` should use time for `Point.t`.
-* `MetricStoreDataSource` Only return points when they're new.
-* High CPU usage when not minimised (reduce FPS, show fewer graphs?)
 * `Notifier` should call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Upload the repo somewhere as a backup.
 
 ## Features
 
@@ -22,8 +17,12 @@
 
 ## Improvements
 
+* `MetricStoreDataSource` should use time for `Point.t`.
+* `MetricStoreDataSource` Only return points when they're new.
+* High CPU usage when not minimised (reduce FPS, show fewer graphs?)
 * No way to terminate a Scheduler
 * No visual feedback from using "Force" button.
+* No way to tell hovering over the check label will show you the log.
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
@@ -32,3 +31,6 @@
 ## Questions
 
 * `Arc<Mutex<State>>` external or internal.
+  - A struct may have better (more concurrent, faster, cheaper) ways
+    of implementing internal mutability itself than a Mutex, e.g. a
+    concurrent data structure.
