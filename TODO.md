@@ -16,14 +16,17 @@
 * Other metric types than `OkErr`.
 * View just failing checks.
 * Web front end
+* Web connectivity check, probably using one of:
+  - http://connectivitycheck.gstatic.com/generate_204
+  - http://www.msftconnecttest.com/connecttest.txt
 
 ## Improvements
 
 * No way to terminate a Scheduler
 * No visual feedback from using "Force" button.
 * `Scheduler` could use a heap to calculate the next jobs in
-  `O(log n)` time, rather than iterating through all jobs frequently in `O(n)`
-  time.
+  `O(log n)` time each, rather than iterating through all jobs frequently in
+  `O(n)` time.
 
 ## Questions
 
