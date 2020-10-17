@@ -83,6 +83,13 @@ fn main() {
                         sched.clone(),
                         ls.clone());
 
+    add_shell_check_job("internet.up.gstatic",
+                        "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s",
+                        chrono::Duration::seconds(120),
+                        ms.clone(),
+                        sched.clone(),
+                        ls.clone());
+
     let msc = ms.clone();
     sched.lock().unwrap().add(scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
@@ -147,7 +154,12 @@ fn build_ui(
         .build();
     window.add(&graphs);
 
-    let metric_names = vec!["ping.mf", "apt.upgradable", "mf.apt.upgradable"];
+    let metric_names = vec![
+        "ping.mf",
+        "internet.up.gstatic",
+        "apt.upgradable",
+        "mf.apt.upgradable",
+    ];
 
     let metrics = metric_names.iter().map(|name| {
         let metric_ui = ui_for_metric(&ms, &sched, &ls, &graphs, &gdk_window, name);
