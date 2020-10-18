@@ -10,7 +10,10 @@
 
 * Other metric types than `OkErr`.
 * View just failing checks.
-* Web front end
+* A smaller view of checks with just Ok/Err plus a button to expand out the graph.
+* Web front end. [actix-web](https://github.com/actix/actix-web) looks good
+* Distributed architecture. [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
+  [rsedis](https://github.com/seppo0010/rsedis) could be nice for real-time pubsub.
 * Web connectivity check, probably using one of:
   - http://connectivitycheck.gstatic.com/generate_204
   - http://www.msftconnecttest.com/connecttest.txt
@@ -26,7 +29,9 @@
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
-* Load metrics, checks from a config file, with hot reload. Maybe use RON or rudano?
+* Load metrics, checks from a config file, with hot reload. Maybe use
+  [RON](https://github.com/ron-rs/ron) or
+  [rudano](https://crates.io/crates/rudano)?
 
 ## Questions
 
