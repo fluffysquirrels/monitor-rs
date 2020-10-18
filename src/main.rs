@@ -20,8 +20,10 @@ use gtk::prelude::*;
 use rt_graph;
 use subprocess;
 use std::{
+    cell::Cell,
     collections::BTreeMap,
     env::args,
+    rc::Rc,
     sync::{Arc, Mutex},
 };
 
@@ -51,7 +53,10 @@ struct Ui {
 
 #[derive(Clone)]
 struct MetricUi {
-    label: gtk::Label,
+    label_status: gtk::Label,
+    graph: Rc<rt_graph::GraphWithControls>,
+    showing_graph: Rc<Cell<bool>>,
+    show_graph_btn: gtk::Button,
 }
 
 fn main() {
@@ -156,10 +161,11 @@ fn build_ui(
     window.show();
     let gdk_window = window.get_window().unwrap();
 
-    let graphs = gtk::BoxBuilder::new()
+    let metrics = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
         .build();
-    window.add(&graphs);
+    window.add(&metrics);
 
     let metric_names = vec![
         "ping.mf",
@@ -170,57 +176,102 @@ fn build_ui(
     ];
 
     let metrics = metric_names.iter().map(|name| {
-        let metric_ui = ui_for_metric(&ms, &sched, &ls, &graphs, &gdk_window, name);
+        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics, &gdk_window, name);
         (String::from(*name), metric_ui)
     }).collect::<BTreeMap<String, MetricUi>>();
 
     window.show_all();
+    for mui in metrics.values() {
+        mui.graph.hide();
+    }
 
     let ui = Ui {
         metrics,
     };
 
-    // Subscribe to log messages and send them over a channel to the UI thread,
-    // which can then update the UI.
-
-    let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
-
-    ls.lock().unwrap().update_signal().connect(move |log| {
-        match tx.send(log) {
-            Err(_) => error!("LogStore UI channel send error"),
-            Ok(_) => (),
-        }
-    });
-
     let ui_thread = glib::MainContext::ref_thread_default();
-    let uic = ui.clone();
-    rx.attach(Some(&ui_thread), move |log| {
-        let metric = uic.metrics.get(&log.name);
-        if let Some(metric) = metric {
-            metric.label.set_tooltip_text(Some(&log.log));
-        }
-        glib::source::Continue(true)
-    });
+
+    {
+        // Subscribe to log messages and send them over a channel to the UI thread,
+        // which can then update the UI with logs.
+
+        let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
+
+        ls.lock().unwrap().update_signal().connect(move |log| {
+            match tx.send(log) {
+                Err(_) => error!("LogStore UI channel send error"),
+                Ok(_) => (),
+            }
+        });
+
+        let uic = ui.clone();
+        rx.attach(Some(&ui_thread), move |log| {
+            let metric = uic.metrics.get(&log.name);
+            if let Some(metric) = metric {
+                metric.label_status.set_tooltip_text(Some(&log.log));
+            }
+            glib::source::Continue(true)
+        });
+    }
+
+    {
+        // Subscribe to metric updates and send them over a channel to the UI thread,
+        // which can then update the UI with metric status.
+
+        let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
+
+        ms.lock().unwrap().update_signal().connect(move |metric| {
+            match tx.send(metric) {
+                Err(_) => error!("MetricStore UI channel send error"),
+                Ok(_) => (),
+            }
+        });
+
+        let uic = ui.clone();
+        rx.attach(Some(&ui_thread), move |metric| {
+            if let Some(DataPoint { val, .. }) = metric.latest() {
+                let ui_metric = uic.metrics.get(metric.name());
+                if let Some(ui_metric) = ui_metric {
+                    ui_metric.label_status.set_text(&format!(" = {}", val));
+                }
+            }
+            glib::source::Continue(true)
+        });
+    }
 }
 
 fn ui_for_metric<C>(
     ms: &Arc<Mutex<MetricStore>>,
     sched: &Arc<Mutex<Scheduler>>,
     _ls: &Arc<Mutex<LogStore>>,
-    graphs: &C,
+    container: &C,
     gdk_window: &gdk::Window,
     metric_name: &str
 ) -> MetricUi
     where C: IsA<gtk::Container> + IsA<gtk::Widget>
 {
-    let label = gtk::LabelBuilder::new()
+    let label_box = gtk::BoxBuilder::new()
+        .parent(container)
+        .orientation(gtk::Orientation::Horizontal)
+        .build();
+    let _label = gtk::LabelBuilder::new()
         .label(metric_name)
-        .parent(graphs)
+        .parent(&label_box)
+        .build();
+    let label_status = gtk::LabelBuilder::new()
+        .label(" = ?")
+        .parent(&label_box)
+        .build();
+
+    let buttons_box = gtk::BoxBuilder::new()
+        .orientation(gtk::Orientation::Horizontal)
+        .parent(container)
+        .spacing(8)
         .build();
 
     let force_btn = gtk::ButtonBuilder::new()
         .label("Force")
-        .parent(graphs)
+        .parent(&buttons_box)
         .halign(gtk::Align::Start)
         .build();
     let sched = sched.clone();
@@ -228,6 +279,12 @@ fn ui_for_metric<C>(
     force_btn.connect_clicked(move |_btn| {
         sched.lock().unwrap().force_run(&metric_name_clone);
     });
+
+    let show_graph_btn = gtk::ButtonBuilder::new()
+        .label("Show graph")
+        .parent(&buttons_box)
+        .halign(gtk::Align::Start)
+        .build();
 
     let config = rt_graph::ConfigBuilder::default()
         .data_source(MetricStoreDataSource {
@@ -239,11 +296,33 @@ fn ui_for_metric<C>(
         .graph_height(100)
         .build()
         .unwrap();
-    let mut _g = rt_graph::GraphWithControls::build_ui(config, graphs, &gdk_window);
+    let graph = rt_graph::GraphWithControls::build_ui(config, container, &gdk_window);
 
-    MetricUi {
-        label,
-    }
+    let metric_ui = MetricUi {
+        label_status,
+        graph: Rc::new(graph),
+        showing_graph: Rc::new(Cell::new(false)),
+        show_graph_btn,
+    };
+
+    let muc = metric_ui.clone();
+    metric_ui.show_graph_btn.connect_clicked(move |_btn| {
+        match muc.showing_graph.get() {
+            true => {
+                muc.showing_graph.set(false);
+                muc.show_graph_btn.set_label("Show graph");
+                muc.graph.hide();
+            },
+            false => {
+                muc.showing_graph.set(true);
+                muc.show_graph_btn.set_label("Hide graph");
+                muc.graph.show();
+            },
+
+        }
+    });
+
+    metric_ui
 }
 
 struct MetricStoreDataSource {
@@ -362,4 +441,15 @@ fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
         duration,
     };
     res
+}
+
+impl std::fmt::Display for MetricValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            MetricValue::OkErr(OkErr::Ok) => f.write_str("Ok"),
+            MetricValue::OkErr(OkErr::Err) => f.write_str("Err"),
+            MetricValue::_I64(int) => f.write_str(&format!("{}", int)),
+            MetricValue::_F64(float) => f.write_str(&format!("{}", float)),
+        }
+    }
 }
