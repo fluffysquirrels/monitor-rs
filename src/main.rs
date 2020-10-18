@@ -90,6 +90,13 @@ fn main() {
                         sched.clone(),
                         ls.clone());
 
+    add_shell_check_job("zfs.mf.healthy",
+                        "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'",
+                        chrono::Duration::seconds(120),
+                        ms.clone(),
+                        sched.clone(),
+                        ls.clone());
+
     let msc = ms.clone();
     sched.lock().unwrap().add(scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
@@ -159,6 +166,7 @@ fn build_ui(
         "internet.up.gstatic",
         "apt.upgradable",
         "mf.apt.upgradable",
+        "zfs.mf.healthy",
     ];
 
     let metrics = metric_names.iter().map(|name| {
