@@ -69,7 +69,6 @@ impl Scheduler {
     //         }
 
     // TODO: Exit condition.
-    // TODO: Don't lock the states for so long.
     fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>) {
         loop {
             // The goal is to lock `states` for multiple short
