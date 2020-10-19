@@ -14,8 +14,8 @@
 * Distributed architecture. [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
   [rsedis](https://github.com/seppo0010/rsedis) could be nice for real-time pubsub.
 * Web connectivity check, probably using one of:
-  - http://connectivitycheck.gstatic.com/generate_204
-  - http://www.msftconnecttest.com/connecttest.txt
+    - http://connectivitycheck.gstatic.com/generate_204
+    - http://www.msftconnecttest.com/connecttest.txt
 
 ## Improvements
 
@@ -38,11 +38,11 @@
 ## Questions
 
 * `Arc<Mutex<State>>` external or internal?
-  - A struct may have better (more concurrent, faster, cheaper) ways
-    of implementing internal mutability itself than a Mutex, e.g. a
-    concurrent data structure.
-  - External wrappers give the user the choice about how to control the struct
-  - Internal wrappers are probably easier to use
+    - A struct may have better (more concurrent, faster, cheaper) ways
+      of implementing internal mutability itself than a Mutex, e.g. a
+      concurrent data structure.
+    - External wrappers give the user the choice about how to control the struct
+    - Internal wrappers are probably easier to use
 
 ## `shell_check` timeout notes
 
