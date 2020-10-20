@@ -2,7 +2,6 @@
 
 ## Bugs
 
-* `shell_check` has no timeout (see notes below)
 * `Notifier` should call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
 

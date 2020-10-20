@@ -17,8 +17,8 @@ use crate::{
 use gio::prelude::*;
 use glib;
 use gtk::prelude::*;
+use process_control::{ChildExt, Timeout};
 use rt_graph;
-use subprocess;
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -380,21 +380,43 @@ fn add_shell_check_job(
     let name2 = name.to_owned();
     let j = scheduler::JobDefinition {
         f: Arc::new(Mutex::new(move |_rc| {
+            let mut command = std::process::Command::new("sh");
+            command.arg("-c");
+            command.arg(&cmd);
             let start = chrono::Utc::now();
-            let res = shell_check(subprocess::Exec::shell(&cmd));
+            let res = shell_check(command);
             let finish = chrono::Utc::now();
 
-            debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
-            ms.lock().unwrap().update(&name2, DataPoint {
-                time: chrono::Utc::now(),
-                val: MetricValue::OkErr(res.ok)
-            });
-            ls.lock().unwrap().update(Log {
-                start, finish,
-                duration: res.duration,
-                log: res.log,
-                name: String::from(&name2),
-            });
+            match res {
+                Ok(res) => {
+                    debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
+                    ms.lock().unwrap().update(&name2, DataPoint {
+                        time: chrono::Utc::now(),
+                        val: MetricValue::OkErr(res.ok)
+                    });
+                    ls.lock().unwrap().update(Log {
+                        start, finish,
+                        duration: res.duration,
+                        log: res.log,
+                        name: String::from(&name2),
+                    });
+                },
+                Err(e) => {
+                    error!("shell_check cmd=`{}' error={}", &cmd, e);
+                    ms.lock().unwrap().update(&name2, DataPoint {
+                        time: chrono::Utc::now(),
+                        val: MetricValue::OkErr(OkErr::Err),
+                    });
+                    ls.lock().unwrap().update(Log {
+                        start, finish,
+                        // Susceptible to shifts in time, e.g. leap seconds.
+                        duration: std::time::Duration::from_millis(
+                            (finish - start).num_milliseconds() as u64),
+                        log: format!("Error={}", e),
+                        name: String::from(&name2),
+                    });
+                }
+            }
         })),
         interval: interval,
         name: String::from(name),
@@ -407,40 +429,45 @@ fn add_shell_check_job(
 struct ShellCheckResult {
     log: String,
     ok: OkErr,
-    exit_code: Option<u32>,
+    exit_code: Option<i64>,
     duration: std::time::Duration,
 }
 
-fn shell_check(cmd: subprocess::Exec) -> ShellCheckResult {
+fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::io::Error> {
+    let cmd = cmd.stdout(std::process::Stdio::piped())
+                 .stderr(std::process::Stdio::piped());
     let start = std::time::Instant::now();
-    let res = cmd
-        .stdout(subprocess::Redirection::Pipe)
-        .stderr(subprocess::Redirection::Merge)
-        .capture().unwrap();
+    let res = cmd.spawn()?
+                 .with_output_timeout(std::time::Duration::from_secs(15))
+                 .terminating()
+                 .wait()?
+                 .ok_or_else(|| {
+                     std::io::Error::new(std::io::ErrorKind::TimedOut, "Process timed out")
+                 })?;
     let end = std::time::Instant::now();
     let duration: std::time::Duration = end - start;
 
     let mut log = String::new();
-    log.push_str("stdout & stderr:\n=======\n");
-    log.push_str(&*res.stdout_str());
+    log.push_str("stdout:\n=======\n");
+    log.push_str(&String::from_utf8_lossy(&res.stdout));
+    log.push_str("=======\n");
+    log.push_str("stderr:\n=======\n");
+    log.push_str(&String::from_utf8_lossy(&res.stderr));
     log.push_str("=======\n");
 
-    log.push_str(&format!("exit_status: {:?}\n", res.exit_status));
+    log.push_str(&format!("exit_status: {:?}\n", res.status));
     log.push_str(&format!("duration: {}ms", duration.as_millis()));
 
     let res = ShellCheckResult {
         log: log,
-        exit_code: match res.exit_status {
-            subprocess::ExitStatus::Exited(code) => Some(code),
-            _ => None,
-        },
-        ok: match res.exit_status {
-            subprocess::ExitStatus::Exited(0) => OkErr::Ok,
-            _ => OkErr::Err,
+        exit_code: res.status.code(),
+        ok: match res.status.success() {
+            false => OkErr::Err,
+            true => OkErr::Ok,
         },
         duration,
     };
-    res
+    Ok(res)
 }
 
 impl std::fmt::Display for MetricValue {
