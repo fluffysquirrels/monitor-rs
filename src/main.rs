@@ -232,7 +232,14 @@ fn build_ui(
             if let Some(DataPoint { val, .. }) = metric.latest() {
                 let ui_metric = uic.metrics.get(metric.name());
                 if let Some(ui_metric) = ui_metric {
-                    ui_metric.label_status.set_text(&format!(" = {}", val));
+                    if let MetricValue::OkErr(ok) = val {
+                        ui_metric.label_status.set_markup(match ok {
+                            OkErr::Ok  => " = <span fgcolor='#00cc00'>Ok</span>",
+                            OkErr::Err => " = <span fgcolor='#cc0000'>Err</span>",
+                        });
+                    } else {
+                        ui_metric.label_status.set_text(&format!(" = {}", val));
+                    }
                 }
             }
             glib::source::Continue(true)
@@ -259,9 +266,9 @@ fn ui_for_metric<C>(
         .parent(&label_box)
         .build();
     let label_status = gtk::LabelBuilder::new()
-        .label(" = ?")
         .parent(&label_box)
         .build();
+    label_status.set_markup(" = <span fgcolor='#cccc00'>?</span>");
 
     let buttons_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Horizontal)
