@@ -7,14 +7,14 @@
 
 ## Features
 
+* Show job start and stop time in log.
 * Other metric types than `OkErr`.
 * View just failing checks.
 * Web front end. [actix-web](https://github.com/actix/actix-web) looks good
-* Distributed architecture. [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
-  [rsedis](https://github.com/seppo0010/rsedis) could be nice for real-time pubsub.
-* Web connectivity check, probably using one of:
-    - http://connectivitycheck.gstatic.com/generate_204
-    - http://www.msftconnecttest.com/connecttest.txt
+* Distributed architecture.
+  [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
+  [rsedis](https://github.com/seppo0010/rsedis) and
+  [redis-rs](https://github.com/mitsuhiko/redis-rs) could be nice for real-time pubsub.
 
 ## Improvements
 
@@ -43,8 +43,11 @@
 
 ## `shell_check` timeout notes
 
+* Crate process_control. Terminates the process from another thread,
+  doesn't support merging stdout and stderr.
 * Various solutions suggested here:
   https://stackoverflow.com/questions/282176/waitpid-equivalent-with-timeout
+* Poll for completion?
 * sigtimedwait for SIGCHLD, but signals are still nasty and need masking on all threads
   https://man7.org/linux/man-pages/man2/sigtimedwait.2.html
 * signalfd for SIGCHLD, but signals are still nasty and need masking on all threads, Linux only
