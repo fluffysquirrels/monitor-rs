@@ -1,13 +1,17 @@
 use std::{
     collections::BTreeMap,
-    sync::{Arc, Mutex},
+    sync::{Arc, mpsc, Mutex},
     thread,
-    time::Duration,
 };
 
 pub struct Scheduler {
     states: Arc<Mutex<BTreeMap<String, JobState>>>,
-    job_thread: Option<thread::JoinHandle<()>>,
+    job_thread: Option<JobThread>,
+}
+
+struct JobThread {
+    handle: thread::JoinHandle<()>,
+    tx: mpsc::SyncSender<ThreadMessage>,
 }
 
 pub struct JobDefinition {
@@ -23,6 +27,11 @@ struct JobState {
 }
 
 pub struct RunContext {}
+
+enum ThreadMessage {
+    Shutdown,
+    ForceRun,
+}
 
 impl Scheduler {
     pub fn new() -> Scheduler {
@@ -48,28 +57,45 @@ impl Scheduler {
                     .get_mut(job_name)
                     .expect("To find the job");
         j.force_run = true;
+        if let Some(t) = self.job_thread.as_ref() {
+            match t.tx.send(ThreadMessage::ForceRun) {
+                Err(_) =>
+                    error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped"),
+                Ok(_) => (),
+            }
+        };
     }
 
     pub fn spawn(&mut self) {
         assert!(self.job_thread.is_none());
         let sc = self.states.clone();
-        self.job_thread = Some(
-            thread::Builder::new().name("scheduler".to_owned())
-                .spawn(move || {
-                    Self::run(sc)
-                }).unwrap()
-        );
+        let (tx, rx) = mpsc::sync_channel::<ThreadMessage>(5);
+        let handle = thread::Builder::new().name("scheduler".to_owned())
+                        .spawn(move || {
+                            Self::run(sc, rx)
+                        }).unwrap();
+        self.job_thread = Some(JobThread {
+            handle,
+            tx,
+        });
     }
 
-    //         pub fn join(&mut self) {
-    //             assert!(self.job_thread.is_some());
-    //             let t = self.job_thread.take();
-    //             set_exit_condition();
-    //             t.join();
-    //         }
+    pub fn join(&mut self) {
+        assert!(self.job_thread.is_some());
+        let t = self.job_thread.take().unwrap();
+        match t.tx.send(ThreadMessage::Shutdown) {
+            Err(_) =>
+                error!("Error sending scheduler::ThreadMessage::Shutdown, remote end is dropped"),
+            Ok(_) => (),
+        };
+        match t.handle.join() {
+            Err(e) => error!("Error joining scheduler thread: {:?}", e),
+            Ok(_) => (),
+        };
+    }
 
     // TODO: Exit condition.
-    fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>) {
+    fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>, rx: mpsc::Receiver<ThreadMessage>) {
         loop {
             // The goal is to lock `states` for multiple short
             // durations rather than one long duration (including the
@@ -112,7 +138,27 @@ impl Scheduler {
             }
 
             // Wait a short period before evaluating the jobs again to check what to run.
-            thread::sleep(Duration::from_secs(1));
+            let res = rx.recv_timeout(std::time::Duration::from_secs(1));
+            match res {
+                Ok(msg) => match msg {
+                    ThreadMessage::Shutdown => return,
+                    ThreadMessage::ForceRun => (),
+                },
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Scheduler;
+
+    #[test]
+    fn join() {
+        let mut s = Scheduler::new();
+        s.spawn();
+        s.join();
     }
 }

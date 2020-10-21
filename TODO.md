@@ -28,8 +28,6 @@
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
-* `Scheduler` should wait on a channel instead of sleeping unconditionally.
-  Then it can respond quickly to signals to shut down or start a forced job.
 * Load metrics, checks from a config file, with hot reload. Maybe use
   [RON](https://github.com/ron-rs/ron) or
   [rudano](https://crates.io/crates/rudano)?
