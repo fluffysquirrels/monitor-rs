@@ -7,7 +7,8 @@ mod notifier;
 mod scheduler;
 mod signal;
 
-use crate::{
+// pub use to fix compiler dead_code warnings.
+pub use crate::{
     log_store::{Log, LogStore},
     metric_store::MetricStore,
     notifier::Notifier,
