@@ -65,61 +65,64 @@ impl<T: Clone> Signal<T> {
 #[cfg(test)]
 mod test {
     use crate::Signal;
-    use std::{cell::Cell, rc::Rc};
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn signal() {
         let mut sig = Signal::new();
 
-        let data: Rc<Cell<u32>> = Rc::new(Cell::new(0));
-        assert_eq!(data.get(), 0);
+        let data: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+        assert_eq!(*data.lock().unwrap(), 0);
 
         let dc = data.clone();
         let subid = sig.connect(move |v| {
-            dc.set(dc.get() + v);
+            let mut lock = dc.lock().unwrap();
+            *lock = *lock + v;
         });
-        assert_eq!(data.get(), 0);
+        assert_eq!(*data.lock().unwrap(), 0);
 
         sig.raise(1);
-        assert_eq!(data.get(), 1);
+        assert_eq!(*data.lock().unwrap(), 1);
 
         sig.raise(2);
-        assert_eq!(data.get(), 3);
+        assert_eq!(*data.lock().unwrap(), 3);
 
         sig.disconnect(subid);
 
         sig.raise(0);
-        assert_eq!(data.get(), 3);
+        assert_eq!(*data.lock().unwrap(), 3);
     }
 
     #[test]
     fn signal_multiple_subscriptions() {
         let mut sig = Signal::new();
 
-        let data: Rc<Cell<u32>> = Rc::new(Cell::new(0));
-        assert_eq!(data.get(), 0);
+        let data: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+        assert_eq!(*data.lock().unwrap(), 0);
 
         let dc = data.clone();
         let sub1 = sig.connect(move |_v| {
-            dc.set(dc.get() + 1);
+            let mut lock = dc.lock().unwrap();
+            *lock = *lock + 1;
         });
         let dc = data.clone();
         let sub2 = sig.connect(move |_v| {
-            dc.set(dc.get() + 10);
+            let mut lock = dc.lock().unwrap();
+            *lock = *lock + 10;
         });
 
         sig.raise(0);
-        assert_eq!(data.get(), 11);
+        assert_eq!(*data.lock().unwrap(), 11);
 
         sig.disconnect(sub1);
 
         sig.raise(0);
-        assert_eq!(data.get(), 21);
+        assert_eq!(*data.lock().unwrap(), 21);
 
         sig.disconnect(sub2);
         sig.raise(0);
 
         sig.raise(0);
-        assert_eq!(data.get(), 21);
+        assert_eq!(*data.lock().unwrap(), 21);
     }
 }
