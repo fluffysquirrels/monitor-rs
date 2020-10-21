@@ -60,6 +60,42 @@ struct MetricUi {
     show_graph_btn: gtk::Button,
 }
 
+struct ShellCheckConfig {
+    name: String,
+    cmd: String,
+    interval: chrono::Duration,
+}
+
+fn shell_check_configs() -> Vec<ShellCheckConfig> {
+    vec![
+        ShellCheckConfig {
+            name: "ping.mf".to_owned(),
+            cmd: "ping -c 1 -W 5 mf".to_owned(),
+            interval: chrono::Duration::seconds(5),
+        },
+        ShellCheckConfig {
+            name: "apt.upgradable".to_owned(),
+            cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
+            interval: chrono::Duration::seconds(600),
+        },
+        ShellCheckConfig {
+            name: "mf.apt.upgradable".to_owned(),
+            cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
+            interval: chrono::Duration::seconds(600),
+        },
+        ShellCheckConfig {
+            name: "internet.up.gstatic".to_owned(),
+            cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
+            interval: chrono::Duration::seconds(120),
+        },
+        ShellCheckConfig {
+            name: "zfs.mf.healthy".to_owned(),
+            cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
+            interval: chrono::Duration::seconds(120),
+        },
+    ]
+}
+
 fn main() {
     env_logger::init();
 
@@ -68,40 +104,13 @@ fn main() {
     let sched = Arc::new(Mutex::new(Scheduler::new()));
     let ls = Arc::new(Mutex::new(LogStore::new()));
 
-    add_shell_check_job("ping.mf",
-                        "ping -c 1 -W 5 mf",
-                        chrono::Duration::seconds(5),
-                        ms.clone(),
-                        sched.clone(),
-                        ls.clone());
-
-    add_shell_check_job("apt.upgradable",
-                        "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py",
-                        chrono::Duration::seconds(600),
-                        ms.clone(),
-                        sched.clone(),
-                        ls.clone());
-
-    add_shell_check_job("mf.apt.upgradable",
-                        "ssh mf /home/alex/Code/apt-upgradable.py",
-                        chrono::Duration::seconds(600),
-                        ms.clone(),
-                        sched.clone(),
-                        ls.clone());
-
-    add_shell_check_job("internet.up.gstatic",
-                        "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s",
-                        chrono::Duration::seconds(120),
-                        ms.clone(),
-                        sched.clone(),
-                        ls.clone());
-
-    add_shell_check_job("zfs.mf.healthy",
-                        "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'",
-                        chrono::Duration::seconds(120),
-                        ms.clone(),
-                        sched.clone(),
-                        ls.clone());
+    let configs = shell_check_configs();
+    for scc in configs.iter() {
+        add_shell_check_job(scc,
+                            ms.clone(),
+                            sched.clone(),
+                            ls.clone());
+    }
 
     let msc = ms.clone();
     sched.lock().unwrap().add(scheduler::JobDefinition {
@@ -139,13 +148,14 @@ fn main() {
         let ms = msc.clone();
         let sc = sc.clone();
         let ls = lsc.clone();
-        build_ui(app, ms, sc, ls);
+        build_ui(&configs, app, ms, sc, ls);
     });
 
     application.run(&args().collect::<Vec<_>>());
 }
 
 fn build_ui(
+    configs: &[ShellCheckConfig],
     application: &gtk::Application,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
@@ -168,17 +178,9 @@ fn build_ui(
         .build();
     window.add(&metrics);
 
-    let metric_names = vec![
-        "ping.mf",
-        "internet.up.gstatic",
-        "apt.upgradable",
-        "mf.apt.upgradable",
-        "zfs.mf.healthy",
-    ];
-
-    let metrics = metric_names.iter().map(|name| {
-        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics, &gdk_window, name);
-        (String::from(*name), metric_ui)
+    let metrics = configs.iter().map(|config| {
+        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics, &gdk_window, &config.name);
+        (String::from(&config.name), metric_ui)
     }).collect::<BTreeMap<String, MetricUi>>();
 
     window.show_all();
@@ -377,16 +379,16 @@ impl rt_graph::DataSource for MetricStoreDataSource {
 }
 
 fn add_shell_check_job(
-    name: &str,
-    cmd: &str,
-    interval: chrono::Duration,
+    config: &ShellCheckConfig,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
     ls: Arc<Mutex<LogStore>>,
 ) {
-    let cmd = cmd.to_owned();
-    let name2 = name.to_owned();
+    let cmd = config.cmd.to_owned();
+    let name = config.name.to_owned();
     let j = scheduler::JobDefinition {
+        interval: config.interval,
+        name: String::from(&name),
         f: Arc::new(Mutex::new(move |_rc| {
             let mut command = std::process::Command::new("sh");
             command.arg("-c");
@@ -398,7 +400,7 @@ fn add_shell_check_job(
             match res {
                 Ok(res) => {
                     debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
-                    ms.lock().unwrap().update(&name2, DataPoint {
+                    ms.lock().unwrap().update(&name, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(res.ok)
                     });
@@ -406,12 +408,12 @@ fn add_shell_check_job(
                         start, finish,
                         duration: res.duration,
                         log: res.log,
-                        name: String::from(&name2),
+                        name: String::from(&name),
                     });
                 },
                 Err(e) => {
                     error!("shell_check cmd=`{}' error={}", &cmd, e);
-                    ms.lock().unwrap().update(&name2, DataPoint {
+                    ms.lock().unwrap().update(&name, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(OkErr::Err),
                     });
@@ -421,13 +423,11 @@ fn add_shell_check_job(
                         duration: std::time::Duration::from_millis(
                             (finish - start).num_milliseconds() as u64),
                         log: format!("Error={}", e),
-                        name: String::from(&name2),
+                        name: String::from(&name),
                     });
                 }
             }
         })),
-        interval: interval,
-        name: String::from(name),
     };
     sched.lock().unwrap()
          .add(j);
