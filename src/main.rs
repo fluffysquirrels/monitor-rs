@@ -394,7 +394,7 @@ fn add_shell_check_job(
             command.arg("-c");
             command.arg(&cmd);
 
-            // Ugly: calculates UTC time twice.
+            // Ugly: calculates UTC time twice, once in shell_check and once here.
             let start = chrono::Utc::now();
             let res = shell_check(command);
             let finish = chrono::Utc::now();
