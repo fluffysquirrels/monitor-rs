@@ -49,6 +49,13 @@ impl Scheduler {
                 last_finish: None,
                 force_run: false,
             });
+        if let Some(t) = self.job_thread.as_ref() {
+            match t.tx.send(ThreadMessage::ForceRun) {
+                Err(_) =>
+                    error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped"),
+                Ok(_) => (),
+            }
+        };
     }
 
     pub fn force_run(&mut self, job_name: &str) {
@@ -105,7 +112,7 @@ impl Scheduler {
             // First collect the names of the jobs that are eligible to run.
             // TODO: This could use a heap.
             let to_run = states.lock().unwrap()
-                .values_mut()
+                .values()
                 .filter(|s| {
                     s.last_finish.is_none()
                         || (s.last_finish.unwrap() + s.def.interval < chrono::Utc::now())
