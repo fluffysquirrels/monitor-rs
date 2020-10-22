@@ -393,6 +393,8 @@ fn add_shell_check_job(
             let mut command = std::process::Command::new("sh");
             command.arg("-c");
             command.arg(&cmd);
+
+            // Ugly: calculates UTC time twice.
             let start = chrono::Utc::now();
             let res = shell_check(command);
             let finish = chrono::Utc::now();
@@ -405,7 +407,8 @@ fn add_shell_check_job(
                         val: MetricValue::OkErr(res.ok)
                     });
                     ls.lock().unwrap().update(Log {
-                        start, finish,
+                        start: res.start_time,
+                        finish: res.finish_time,
                         duration: res.duration,
                         log: res.log,
                         name: String::from(&name),
@@ -439,12 +442,15 @@ struct ShellCheckResult {
     ok: OkErr,
     exit_code: Option<i64>,
     duration: std::time::Duration,
+    start_time: chrono::DateTime<chrono::Utc>,
+    finish_time: chrono::DateTime<chrono::Utc>,
 }
 
 fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::io::Error> {
     let cmd = cmd.stdout(std::process::Stdio::piped())
                  .stderr(std::process::Stdio::piped());
     let start = std::time::Instant::now();
+    let start_utc = chrono::Utc::now();
     let res = cmd.spawn()?
                  .with_output_timeout(std::time::Duration::from_secs(15))
                  .terminating()
@@ -452,8 +458,10 @@ fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::
                  .ok_or_else(|| {
                      std::io::Error::new(std::io::ErrorKind::TimedOut, "Process timed out")
                  })?;
-    let end = std::time::Instant::now();
-    let duration: std::time::Duration = end - start;
+    let finish = std::time::Instant::now();
+    let finish_utc = chrono::Utc::now();
+
+    let duration: std::time::Duration = finish - start;
 
     let mut log = String::new();
     log.push_str("stdout:\n=======\n");
@@ -464,7 +472,11 @@ fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::
     log.push_str("=======\n");
 
     log.push_str(&format!("exit_status: {:?}\n", res.status));
-    log.push_str(&format!("duration: {}ms", duration.as_millis()));
+    log.push_str(&format!("duration: {}ms\n", duration.as_millis()));
+    log.push_str(&format!("start: {}\n",
+                          start_utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)));
+    log.push_str(&format!("finish: {}",
+                          finish_utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)));
 
     let res = ShellCheckResult {
         log: log,
@@ -474,6 +486,8 @@ fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::
             true => OkErr::Ok,
         },
         duration,
+        start_time: start_utc,
+        finish_time: finish_utc,
     };
     Ok(res)
 }

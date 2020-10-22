@@ -7,7 +7,6 @@
 
 ## Features
 
-* Show job start and stop time in log.
 * Other metric types than `OkErr`.
 * View just failing checks.
 * Web front end. [actix-web](https://github.com/actix/actix-web) looks good
