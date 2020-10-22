@@ -7,6 +7,7 @@
 
 ## Features
 
+* Configure flakey metric detection: need at least n failures before notification.
 * Other metric types than `OkErr`.
 * View just failing checks.
 * Web front end. [actix-web](https://github.com/actix/actix-web) looks good
@@ -20,13 +21,13 @@
 * `MetricStoreDataSource` should use time for `Point.t`.
 * `MetricStoreDataSource` Only return points when they're new.
 * High CPU usage when not minimised (reduce FPS, show fewer graphs?)
-* No way to terminate a Scheduler
 * No visual feedback from using "Force" button. It should be disabled
   when you click it and enabled again when the job finishes.
 * No way to tell hovering over the check label will show you the log.
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
+* `Scheduler` can sleep more intelligently: until the next job is due.
 * Load metrics, checks from a config file, with hot reload. Maybe use
   [RON](https://github.com/ron-rs/ron) or
   [rudano](https://crates.io/crates/rudano)?
