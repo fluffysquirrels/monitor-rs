@@ -19,7 +19,6 @@
 ## Improvements
 
 * `MetricStoreDataSource` should use time for `Point.t`.
-* `MetricStoreDataSource` Only return points when they're new.
 * High CPU usage when not minimised (reduce FPS, show fewer graphs?)
 * No visual feedback from using "Force" button. It should be disabled
   when you click it and enabled again when the job finishes.

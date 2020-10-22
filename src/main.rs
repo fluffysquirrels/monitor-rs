@@ -297,13 +297,12 @@ fn ui_for_metric<C>(
         .build();
 
     let config = rt_graph::ConfigBuilder::default()
-        .data_source(MetricStoreDataSource {
-            metric_name: String::from(metric_name),
-            ms: ms.clone(),
-            t: 1,
-        })
-        .base_zoom_x(10.0)
+        .data_source(MetricStoreDataSource::new(metric_name, ms.clone()))
+        .base_zoom_x(1.0)
+        .max_zoom_x(0.1)
         .graph_height(100)
+        .windows_to_store(2)
+        .point_style(rt_graph::PointStyle::Cross)
         .build()
         .unwrap();
     let graph = rt_graph::GraphWithControls::build_ui(config, container, &gdk_window);
@@ -338,6 +337,7 @@ fn ui_for_metric<C>(
 struct MetricStoreDataSource {
     metric_name: String,
     ms: Arc<Mutex<MetricStore>>,
+    last: Option<DataPoint>,
     t: u32,
 }
 
@@ -349,26 +349,46 @@ impl std::fmt::Debug for MetricStoreDataSource {
     }
 }
 
+impl MetricStoreDataSource {
+    fn new(metric_name: &str, ms: Arc<Mutex<MetricStore>>) -> MetricStoreDataSource {
+        MetricStoreDataSource {
+            metric_name: String::from(metric_name),
+            ms,
+            t: 1,
+            last: None,
+        }
+    }
+}
+
 impl rt_graph::DataSource for MetricStoreDataSource {
     fn get_data(&mut self) -> Result<Vec<rt_graph::Point>, rt_graph::Error> {
         // TODO: Only return points when they're new.
         let m = self.ms.lock().unwrap().query_one(&self.metric_name);
-        let res =
-            m.iter()
-             .map(|m| rt_graph::Point {
-                 t: self.t, // TODO: Use time.
-                 vs: vec![match m.latest() {
-                     Some(DataPoint { val: MetricValue::OkErr(ok), .. }) =>
-                         match ok {
-                             OkErr::Ok => 50000,
-                             OkErr::Err => 10000,
-                         },
-                     // TODO: Add other metric types.
-                     _ => 0,
-                 }],
-             })
-             .collect::<Vec<rt_graph::Point>>();
-        self.t += 1;
+        let res = match m {
+            Some(m) => {
+                let dp = m.latest();
+                match dp {
+                    Some(DataPoint { val: MetricValue::OkErr(ok), time }) => {
+                        if self.last.is_none() ||
+                            (self.last.is_some() && *time != self.last.as_ref().unwrap().time) {
+                            self.t += 1;
+                            self.last = Some(dp.unwrap().clone());
+                            vec![rt_graph::Point {
+                                t: self.t, // TODO: Use time.
+                                vs: vec![match ok {
+                                    OkErr::Ok => 50000,
+                                    OkErr::Err => 10000,
+                                },
+                            ]}]
+                        } else {
+                            vec![]
+                        }
+                    },
+                    _ => vec![],
+                }
+            }
+            None => vec![],
+        };
         Ok(res)
     }
 
