@@ -77,7 +77,7 @@ impl Scheduler {
         assert!(self.job_thread.is_none());
         let sc = self.states.clone();
         let (tx, rx) = mpsc::sync_channel::<ThreadMessage>(5);
-        let handle = thread::Builder::new().name("scheduler".to_owned())
+        let handle = thread::Builder::new().name("monitor-scheduler".to_owned())
                         .spawn(move || {
                             Self::run(sc, rx)
                         }).unwrap();
