@@ -14,4 +14,4 @@ gtk = "0.9.0"
 log = { version = "0.4.11", features = ["release_max_level_debug"] }
 notify-rust = "4"
 process_control = "2.0.2"
-rt-graph = "0.3.2"
+rt-graph = "0.3.3"

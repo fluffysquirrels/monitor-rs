@@ -995,9 +995,9 @@ checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 
 [[package]]
 name = "rt-graph"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35a8aeb34c0be822b0ecc4f711f1c8f0b39b7af5e9f21d4c6b9da04f1367c1ce"
+checksum = "8449dd2b001a6f6ef8aa0db13e5a85a0884105de915a5fef0b7f429117e87d94"
 dependencies = [
  "cairo-rs",
  "derive_builder",
