@@ -76,22 +76,22 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
         ShellCheckConfig {
             name: "apt.upgradable".to_owned(),
             cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
-            interval: chrono::Duration::seconds(600),
+            interval: chrono::Duration::minutes(10),
         },
         ShellCheckConfig {
             name: "mf.apt.upgradable".to_owned(),
             cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
-            interval: chrono::Duration::seconds(600),
+            interval: chrono::Duration::minutes(10),
         },
         ShellCheckConfig {
             name: "internet.up.gstatic".to_owned(),
             cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
-            interval: chrono::Duration::seconds(120),
+            interval: chrono::Duration::minutes(2),
         },
         ShellCheckConfig {
             name: "zfs.mf.healthy".to_owned(),
             cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
-            interval: chrono::Duration::seconds(120),
+            interval: chrono::Duration::minutes(2),
         },
         check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
     ]
