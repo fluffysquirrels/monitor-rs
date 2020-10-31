@@ -101,7 +101,6 @@ impl Scheduler {
         };
     }
 
-    // TODO: Exit condition.
     fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>, rx: mpsc::Receiver<ThreadMessage>) {
         loop {
             // The goal is to lock `states` for multiple short
