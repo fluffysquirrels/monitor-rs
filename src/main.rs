@@ -93,7 +93,23 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
             cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
             interval: chrono::Duration::seconds(120),
         },
+        check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
     ]
+}
+
+fn check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheckConfig {
+    ShellCheckConfig {
+        name: format!("travis.{}.{}.{}.passed", provider, repo, branch),
+        cmd: format!(
+"curl -f -s -H 'Travis-API-Version: 3' 'https://api.travis-ci.com/repo/{}/{}/branch/{}' |
+tee /dev/stderr |
+jq '.last_build.state' |
+egrep '^\"passed\"$'",
+            provider,
+            repo.replace('/', "%2F"),
+            branch),
+        interval: chrono::Duration::minutes(30),
+    }
 }
 
 fn main() {

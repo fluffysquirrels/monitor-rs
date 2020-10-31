@@ -7,6 +7,7 @@
 
 ## Features
 
+* Check Travis builds are passing.
 * Configure flakey metric detection: need at least n failures before notification.
 * Other metric types than `OkErr`.
 * View just failing checks.
