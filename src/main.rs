@@ -94,6 +94,8 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
             interval: chrono::Duration::minutes(2),
         },
         check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
+        check_travis("github", "fluffysquirrels/webdriver_client_rust", "master"),
+        check_travis("github", "fluffysquirrels/framed-rs", "master"),
     ]
 }
 
