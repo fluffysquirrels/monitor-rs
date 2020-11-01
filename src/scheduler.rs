@@ -121,6 +121,7 @@ impl Scheduler {
 
             // Then iterate through the jobs to run.
             for name in to_run.iter() {
+                trace!("Running job `{}'", name);
                 // Lock to get the job work function.
                 let f = match states.lock().unwrap().get(name) {
                     // Didn't find the job, so it was removed, continue with the next job.
@@ -144,7 +145,13 @@ impl Scheduler {
             }
 
             // Wait a short period before evaluating the jobs again to check what to run.
+            let before_wait = std::time::Instant::now();
+            trace!("Scheduler thread sleeping ...");
             let res = rx.recv_timeout(std::time::Duration::from_secs(1));
+            let after_wait = std::time::Instant::now();
+            let wait_duration = after_wait - before_wait;
+            trace!("Scheduler thread slept wait_duration={}ms", wait_duration.as_millis());
+
             match res {
                 Ok(msg) => match msg {
                     ThreadMessage::Shutdown => return,
