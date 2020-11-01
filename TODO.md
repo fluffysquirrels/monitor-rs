@@ -2,15 +2,24 @@
 
 ## Bugs
 
-* `Notifier` should call `NotificationHandle.close()` to avoid
+* `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
 
 ## Features
 
+* Add an OkErr check for disk usage based on the metric.
 * Push checks (e.g. webhooks for Travis)
 * Configure flakey metric detection: need at least n failures before notification.
+* Don't want so many failed check notifications when I resume my laptop from suspend
+  and the network is down for a few seconds
+    * Detect resume (dbus or waaaay too long sleep time (didn't work))
+      and delay checks for a few seconds until the network is back up
+    * Declare checks as requiring the network, delay them until the network is up
+      (ifconfig or ping returns Ok)
+    * No good: require 2+ failed checks for a notification; this is too much delay on failure.
 * Metric type F64.
 * View just failing checks.
+* Scroll through list of checks when they get too long.
 * Web front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture.
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
