@@ -200,6 +200,16 @@ fn build_ui(
         .window_position(gtk::WindowPosition::Center)
         .build();
 
+    // Load icon relative to Cargo provided package root or if that's
+    // unavailable, the current directory.
+    let mut icon_path = std::env::var("CARGO_MANIFEST_DIR")
+        .unwrap_or(".".to_string());
+    icon_path.push_str("/third_party/gnome-icon-theme/utilities-system-monitor.png");
+    match window.set_icon_from_file(icon_path) {
+        Ok(()) => (),
+        Err(e) => error!("Unable to load icon, error: {}", e),
+    };
+
     // Show the (gtk) window so we can get a gdk::window below.
     window.show();
     let gdk_window = window.get_window().unwrap();
