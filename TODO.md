@@ -9,7 +9,7 @@
 
 * Check Travis builds are passing.
 * Configure flakey metric detection: need at least n failures before notification.
-* Other metric types than `OkErr`.
+* Metric type F64.
 * View just failing checks.
 * Web front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture.

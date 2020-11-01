@@ -37,7 +37,7 @@ pub enum OkErr {
 #[derive(Clone, Debug)]
 pub enum MetricValue {
     OkErr(OkErr),
-    _I64(i64),
+    I64(i64),
     _F64(f64),
 }
 
@@ -61,6 +61,12 @@ struct MetricUi {
 }
 
 struct ShellCheckConfig {
+    name: String,
+    cmd: String,
+    interval: chrono::Duration,
+}
+
+struct ShellMetricConfig {
     name: String,
     cmd: String,
     interval: chrono::Duration,
@@ -99,6 +105,16 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
     ]
 }
 
+fn shell_metric_configs() -> Vec<ShellMetricConfig> {
+    vec![
+        ShellMetricConfig {
+            cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
+            name: "df.local.root".to_owned(),
+            interval: chrono::Duration::minutes(5),
+        },
+    ]
+}
+
 fn check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheckConfig {
     ShellCheckConfig {
         name: format!("travis.{}.{}.{}.passed", provider, repo, branch),
@@ -122,24 +138,21 @@ fn main() {
     let sched = Arc::new(Mutex::new(Scheduler::new()));
     let ls = Arc::new(Mutex::new(LogStore::new()));
 
-    let configs = shell_check_configs();
-    for scc in configs.iter() {
+    let check_configs = shell_check_configs();
+    for scc in check_configs.iter() {
         add_shell_check_job(scc,
                             ms.clone(),
                             sched.clone(),
                             ls.clone());
     }
 
-    let msc = ms.clone();
-    sched.lock().unwrap().add(scheduler::JobDefinition {
-        f: Arc::new(Mutex::new(move |_rc| {
-            for m in msc.lock().unwrap().query_all() {
-                debug!("{:?}", m);
-            }
-        })),
-        interval: chrono::Duration::seconds(5),
-        name: String::from("show-metrics"),
-    });
+    let metric_configs = shell_metric_configs();
+    for smc in metric_configs.iter() {
+        add_shell_metric_job(smc,
+                             ms.clone(),
+                             sched.clone(),
+                             ls.clone());
+    }
 
     sched.lock().unwrap().spawn();
 
@@ -166,14 +179,15 @@ fn main() {
         let ms = msc.clone();
         let sc = sc.clone();
         let ls = lsc.clone();
-        build_ui(&configs, app, ms, sc, ls);
+        build_ui(&check_configs, &metric_configs, app, ms, sc, ls);
     });
 
     application.run(&args().collect::<Vec<_>>());
 }
 
 fn build_ui(
-    configs: &[ShellCheckConfig],
+    check_configs: &[ShellCheckConfig],
+    metric_configs: &[ShellMetricConfig],
     application: &gtk::Application,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
@@ -190,16 +204,23 @@ fn build_ui(
     window.show();
     let gdk_window = window.get_window().unwrap();
 
-    let metrics = gtk::BoxBuilder::new()
+    let metrics_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Vertical)
         .spacing(8)
+        .parent(&window)
         .build();
-    window.add(&metrics);
 
-    let metrics = configs.iter().map(|config| {
-        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics, &gdk_window, &config.name);
-        (String::from(&config.name), metric_ui)
-    }).collect::<BTreeMap<String, MetricUi>>();
+    let mut metrics = BTreeMap::<String,MetricUi>::new();
+
+    for config in check_configs.iter() {
+        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics_box, &gdk_window, &config.name);
+        metrics.insert(String::from(&config.name), metric_ui);
+    }
+
+    for config in metric_configs.iter() {
+        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics_box, &gdk_window, &config.name);
+        metrics.insert(String::from(&config.name), metric_ui);
+    }
 
     window.show_all();
     for mui in metrics.values() {
@@ -380,22 +401,23 @@ impl MetricStoreDataSource {
 
 impl rt_graph::DataSource for MetricStoreDataSource {
     fn get_data(&mut self) -> Result<Vec<rt_graph::Point>, rt_graph::Error> {
-        // TODO: Only return points when they're new.
         let m = self.ms.lock().unwrap().query_one(&self.metric_name);
         let res = match m {
             Some(m) => {
                 let dp = m.latest();
                 match dp {
-                    Some(DataPoint { val: MetricValue::OkErr(ok), time }) => {
+                    Some(DataPoint { val, time }) => {
                         if self.last.is_none() ||
                             (self.last.is_some() && *time != self.last.as_ref().unwrap().time) {
                             self.t += 1;
                             self.last = Some(dp.unwrap().clone());
                             vec![rt_graph::Point {
                                 t: self.t, // TODO: Use time.
-                                vs: vec![match ok {
-                                    OkErr::Ok => 50000,
-                                    OkErr::Err => 10000,
+                                vs: vec![match val {
+                                    MetricValue::OkErr(OkErr::Ok)  => 50000,
+                                    MetricValue::OkErr(OkErr::Err) => 10000,
+                                    MetricValue::I64(i) => *i as u16, // TODO: Handle overflow
+                                    MetricValue::_F64(_f) => unimplemented!(),
                                 },
                             ]}]
                         } else {
@@ -416,6 +438,7 @@ impl rt_graph::DataSource for MetricStoreDataSource {
 
 }
 
+// TODO: Ugly duplication between this and add_shell_metric_job.
 fn add_shell_check_job(
     config: &ShellCheckConfig,
     ms: Arc<Mutex<MetricStore>>,
@@ -432,14 +455,14 @@ fn add_shell_check_job(
             command.arg("-c");
             command.arg(&cmd);
 
-            // Ugly: calculates UTC time twice, once in shell_check and once here.
+            // Ugly: calculates UTC time twice, once in run_shell and once here.
             let start = chrono::Utc::now();
-            let res = shell_check(command);
+            let res = run_shell(command);
             let finish = chrono::Utc::now();
 
             match res {
                 Ok(res) => {
-                    debug!("shell_check cmd=`{}' log=\n{}", &cmd, res.log);
+                    debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
                     ms.lock().unwrap().update(&name, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(res.ok)
@@ -453,7 +476,7 @@ fn add_shell_check_job(
                     });
                 },
                 Err(e) => {
-                    error!("shell_check cmd=`{}' error={}", &cmd, e);
+                    error!("run_shell cmd=`{}' error={}", &cmd, e);
                     ms.lock().unwrap().update(&name, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(OkErr::Err),
@@ -474,17 +497,79 @@ fn add_shell_check_job(
          .add(j);
 }
 
+// TODO: Ugly duplication between this and add_shell_check_job.
+fn add_shell_metric_job(
+    config: &ShellMetricConfig,
+    ms: Arc<Mutex<MetricStore>>,
+    sched: Arc<Mutex<Scheduler>>,
+    ls: Arc<Mutex<LogStore>>,
+) {
+    let cmd = config.cmd.to_owned();
+    let name = config.name.to_owned();
+    let j = scheduler::JobDefinition {
+        interval: config.interval,
+        name: String::from(&name),
+        f: Arc::new(Mutex::new(move |_rc| {
+            let mut command = std::process::Command::new("sh");
+            command.arg("-c");
+            command.arg(&cmd);
+
+            // Ugly: calculates UTC time twice, once in run_shell and once here.
+            let start = chrono::Utc::now();
+            let res = run_shell(command);
+            let finish = chrono::Utc::now();
+
+            match res {
+                Ok(res) => {
+                    debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
+                    match res.stdout.trim().parse::<i64>() {
+                        Ok(i) =>
+                            ms.lock().unwrap().update(&name, DataPoint {
+                                time: chrono::Utc::now(),
+                                val: MetricValue::I64(i)
+                            }),
+                        Err(e) =>
+                            error!("Error parsing run_shell stdout: {}", e),
+                    };
+                    ls.lock().unwrap().update(Log {
+                        start: res.start_time,
+                        finish: res.finish_time,
+                        duration: res.duration,
+                        log: res.log,
+                        name: String::from(&name),
+                    });
+                },
+                Err(e) => {
+                    error!("run_shell cmd=`{}' error={}", &cmd, e);
+                    ls.lock().unwrap().update(Log {
+                        start, finish,
+                        // Susceptible to shifts in time, e.g. leap seconds.
+                        duration: std::time::Duration::from_millis(
+                            (finish - start).num_milliseconds() as u64),
+                        log: format!("Error={}", e),
+                        name: String::from(&name),
+                    });
+                }
+            }
+        })),
+    };
+    sched.lock().unwrap()
+         .add(j);
+}
+
 #[derive(Clone, Debug)]
-struct ShellCheckResult {
+struct RunShellResult {
     log: String,
     ok: OkErr,
     exit_code: Option<i64>,
+    stdout: String,
+    stderr: String,
     duration: std::time::Duration,
     start_time: chrono::DateTime<chrono::Utc>,
     finish_time: chrono::DateTime<chrono::Utc>,
 }
 
-fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::io::Error> {
+fn run_shell(mut cmd: std::process::Command) -> Result<RunShellResult, std::io::Error> {
     let cmd = cmd.stdout(std::process::Stdio::piped())
                  .stderr(std::process::Stdio::piped());
     let start = std::time::Instant::now();
@@ -501,12 +586,15 @@ fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::
 
     let duration: std::time::Duration = finish - start;
 
+    let stdout_string = String::from_utf8_lossy(&res.stdout);
+    let stderr_string = String::from_utf8_lossy(&res.stderr);
+
     let mut log = String::new();
     log.push_str("stdout:\n=======\n");
-    log.push_str(&String::from_utf8_lossy(&res.stdout));
+    log.push_str(&stdout_string);
     log.push_str("=======\n");
     log.push_str("stderr:\n=======\n");
-    log.push_str(&String::from_utf8_lossy(&res.stderr));
+    log.push_str(&stderr_string);
     log.push_str("=======\n");
 
     log.push_str(&format!("exit_status: {:?}\n", res.status));
@@ -516,13 +604,15 @@ fn shell_check(mut cmd: std::process::Command) -> Result<ShellCheckResult, std::
     log.push_str(&format!("finish: {}",
                           finish_utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)));
 
-    let res = ShellCheckResult {
+    let res = RunShellResult {
         log: log,
         exit_code: res.status.code(),
         ok: match res.status.success() {
             false => OkErr::Err,
             true => OkErr::Ok,
         },
+        stdout: String::from(stdout_string),
+        stderr: String::from(stderr_string),
         duration,
         start_time: start_utc,
         finish_time: finish_utc,
@@ -535,7 +625,7 @@ impl std::fmt::Display for MetricValue {
         match self {
             MetricValue::OkErr(OkErr::Ok) => f.write_str("Ok"),
             MetricValue::OkErr(OkErr::Err) => f.write_str("Err"),
-            MetricValue::_I64(int) => f.write_str(&format!("{}", int)),
+            MetricValue::I64(int) => f.write_str(&format!("{}", int)),
             MetricValue::_F64(float) => f.write_str(&format!("{}", float)),
         }
     }
