@@ -7,7 +7,7 @@
 
 ## Features
 
-* Check Travis builds are passing.
+* Push checks (e.g. webhooks for Travis)
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
 * View just failing checks.
