@@ -136,6 +136,18 @@ fn shell_metric_configs() -> Vec<ShellMetricConfig> {
             interval: chrono::Duration::minutes(5),
             check: MetricCheck::Max(80),
         },
+        ShellMetricConfig {
+            cmd: "ssh mf df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
+            name: "df.mf.root".to_owned(),
+            interval: chrono::Duration::minutes(5),
+            check: MetricCheck::Max(80),
+        },
+        ShellMetricConfig {
+            cmd: "ssh mf df -h /mnt/monster | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
+            name: "df.mf.monster".to_owned(),
+            interval: chrono::Duration::minutes(5),
+            check: MetricCheck::Max(80),
+        },
     ]
 }
 

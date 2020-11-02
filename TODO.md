@@ -7,7 +7,6 @@
 
 ## Features
 
-* Add disk usage metrics and checks for mf.
 * Show metric checks in green for Ok or red for Err.
 * Push checks (e.g. webhooks for Travis)
 * Configure flakey metric detection: need at least n failures before notification.
