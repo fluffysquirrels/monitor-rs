@@ -77,8 +77,8 @@ struct ShellMetricConfig {
 enum MetricCheck {
     #[allow(dead_code)] // Not used yet.
     None,
-    Min(i64),
     #[allow(dead_code)] // Not used yet.
+    Min(i64),
     Max(i64),
 }
 
@@ -134,7 +134,7 @@ fn shell_metric_configs() -> Vec<ShellMetricConfig> {
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
             name: "df.local.root".to_owned(),
             interval: chrono::Duration::minutes(5),
-            check: MetricCheck::Min(20),
+            check: MetricCheck::Max(80),
         },
     ]
 }
