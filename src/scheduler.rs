@@ -101,7 +101,7 @@ impl Scheduler {
         };
     }
 
-    fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>, rx: mpsc::Receiver<ThreadMessage>) {
+    fn run(states: Arc<Mutex<BTreeMap<String, JobState>>>, mut rx: mpsc::Receiver<ThreadMessage>) {
         loop {
             // The goal is to lock `states` for multiple short
             // durations rather than one long duration (including the
@@ -145,23 +145,60 @@ impl Scheduler {
             }
 
             // Wait a short period before evaluating the jobs again to check what to run.
-            let before_wait = std::time::Instant::now();
-            trace!("Scheduler thread sleeping ...");
-            let res = rx.recv_timeout(std::time::Duration::from_secs(1));
-            let after_wait = std::time::Instant::now();
-            let wait_duration = after_wait - before_wait;
-            trace!("Scheduler thread slept wait_duration={}ms", wait_duration.as_millis());
+            let wait_res = Self::run_wait(&mut rx, std::time::Duration::from_secs(1));
+            match wait_res.flow_control {
+                FlowControl::Exit => return,
+                FlowControl::Continue => (),
+            };
 
-            match res {
-                Ok(msg) => match msg {
-                    ThreadMessage::Shutdown => return,
-                    ThreadMessage::ForceRun => (),
-                },
-                Err(mpsc::RecvTimeoutError::Timeout) => (),
-                Err(mpsc::RecvTimeoutError::Disconnected) => return,
+            if wait_res.wait_duration.num_seconds() >= 10 {
+                info!("Resume from suspend detected");
+                // Wait a bit longer to give time for the network to come back up
+                // after suspending.
+
+                let wait_res = Self::run_wait(&mut rx, std::time::Duration::from_secs(5));
+                match wait_res.flow_control {
+                    FlowControl::Exit => return,
+                    FlowControl::Continue => (),
+                };
             }
         }
     }
+
+    fn run_wait(rx: &mut mpsc::Receiver<ThreadMessage>,
+                desired_sleep_duration: std::time::Duration
+    ) -> WaitResult {
+        let before_wait = chrono::Utc::now();
+        trace!("Scheduler thread sleeping ...");
+        let res = rx.recv_timeout(desired_sleep_duration);
+        let after_wait = chrono::Utc::now();
+        let wait_duration = after_wait - before_wait;
+        trace!("Scheduler thread slept wait_duration={}ms", wait_duration.num_milliseconds());
+
+        let flow_control = match res {
+            Ok(msg) => match msg {
+                ThreadMessage::Shutdown => FlowControl::Exit,
+                ThreadMessage::ForceRun => FlowControl::Continue,
+            },
+            Err(mpsc::RecvTimeoutError::Timeout) => FlowControl::Continue,
+            Err(mpsc::RecvTimeoutError::Disconnected) => FlowControl::Exit,
+        };
+
+        WaitResult {
+            wait_duration,
+            flow_control,
+        }
+    }
+}
+
+struct WaitResult {
+    wait_duration: chrono::Duration,
+    flow_control: FlowControl,
+}
+
+enum FlowControl {
+    Exit,
+    Continue,
 }
 
 #[cfg(test)]
