@@ -7,7 +7,6 @@
 
 ## Features
 
-* Add an OkErr check for disk usage based on the metric.
 * Push checks (e.g. webhooks for Travis)
 * Configure flakey metric detection: need at least n failures before notification.
 * Don't want so many failed check notifications when I resume my laptop from suspend

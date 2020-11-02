@@ -70,6 +70,29 @@ struct ShellMetricConfig {
     name: String,
     cmd: String,
     interval: chrono::Duration,
+    check: MetricCheck,
+}
+
+#[derive(Clone, Debug)]
+enum MetricCheck {
+    #[allow(dead_code)] // Not used yet.
+    None,
+    Min(i64),
+    #[allow(dead_code)] // Not used yet.
+    Max(i64),
+}
+
+impl MetricCheck {
+    fn is_value_ok(&self, value: i64) -> OkErr {
+        match self {
+            MetricCheck::None => OkErr::Ok,
+            MetricCheck::Min(min) if value >= *min => OkErr::Ok,
+            MetricCheck::Min(min) if value <  *min => OkErr::Err,
+            MetricCheck::Max(max) if value <= *max => OkErr::Ok,
+            MetricCheck::Max(max) if value >  *max => OkErr::Err,
+            _ => panic!("Not reached"),
+        }
+    }
 }
 
 fn shell_check_configs() -> Vec<ShellCheckConfig> {
@@ -111,6 +134,7 @@ fn shell_metric_configs() -> Vec<ShellMetricConfig> {
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
             name: "df.local.root".to_owned(),
             interval: chrono::Duration::minutes(5),
+            check: MetricCheck::Min(20),
         },
     ]
 }
@@ -152,6 +176,23 @@ fn main() {
                              ms.clone(),
                              sched.clone(),
                              ls.clone());
+        match &smc.check {
+            MetricCheck::None => (),
+            _ => {
+                let nc = n.clone();
+                let check = smc.check.clone();
+                ms.lock().unwrap()
+                  .update_signal_for_one(&smc.name)
+                  .connect(move |m| {
+                      let val: i64 = m.latest().unwrap()
+                                      .val.as_i64().expect("Only int checks so far");
+                      let ok = check.is_value_ok(val);
+                      debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
+                             m.name(), val, check, ok);
+                      nc.lock().unwrap().update_metric(m.name(), ok);
+                  });
+            },
+        };
     }
 
     sched.lock().unwrap().spawn();
@@ -159,7 +200,7 @@ fn main() {
     // Listen to metrics and connect the Notifier.
     let nc = n.clone();
     ms.lock().unwrap()
-        .update_signal()
+        .update_signal_for_all()
         .connect(move |m|
                  {
                      if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
@@ -272,7 +313,7 @@ fn build_ui(
 
         let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
 
-        ms.lock().unwrap().update_signal().connect(move |metric| {
+        ms.lock().unwrap().update_signal_for_all().connect(move |metric| {
             match tx.send(metric) {
                 Err(_) => error!("MetricStore UI channel send error"),
                 Ok(_) => (),
@@ -637,6 +678,15 @@ impl std::fmt::Display for MetricValue {
             MetricValue::OkErr(OkErr::Err) => f.write_str("Err"),
             MetricValue::I64(int) => f.write_str(&format!("{}", int)),
             MetricValue::_F64(float) => f.write_str(&format!("{}", float)),
+        }
+    }
+}
+
+impl MetricValue {
+    fn as_i64(&self) -> Option<i64> {
+        match self {
+            MetricValue::I64(i) => Some(*i),
+            _ => None,
         }
     }
 }
