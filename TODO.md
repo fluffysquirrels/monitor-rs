@@ -7,12 +7,15 @@
 
 ## Features
 
+* Add disk usage metrics and checks for mf.
 * Push checks (e.g. webhooks for Travis)
 * Configure flakey metric detection: need at least n failures before notification.
 * Don't want so many failed check notifications when I resume my laptop from suspend
   and the network is down for a few seconds
-    * Detect resume (dbus or waaaay too long sleep time (didn't work))
-      and delay checks for a few seconds until the network is back up
+    * Detect resume (dbus or waaaay too long sleep time (didn't work
+      with std::time::Instant, sleep time was < 2s, might work with
+      chrono::utc::now())) and delay checks for a few seconds until
+      the network is back up
     * Declare checks as requiring the network, delay them until the network is up
       (ifconfig or ping returns Ok)
     * No good: require 2+ failed checks for a notification; this is too much delay on failure.
