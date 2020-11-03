@@ -161,9 +161,9 @@ pub fn create_shell_checks(
 {
     for scc in check_configs.iter() {
         add_shell_check_job(scc,
+                            ls.clone(),
                             ms.clone(),
-                            sched.clone(),
-                            ls.clone());
+                            sched.clone());
     }
 }
 
@@ -176,9 +176,9 @@ pub fn create_shell_metrics(
 {
     for smc in metric_configs.iter() {
         add_shell_metric_job(smc,
+                             ls.clone(),
                              ms.clone(),
-                             sched.clone(),
-                             ls.clone());
+                             sched.clone());
         connect_metric_to_notifier(&smc, &ms, &n);
     }
 }
@@ -186,9 +186,9 @@ pub fn create_shell_metrics(
 // TODO: Ugly duplication between this and add_shell_metric_job.
 pub fn add_shell_check_job(
     config: &ShellCheckConfig,
+    ls: Arc<Mutex<LogStore>>,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
-    ls: Arc<Mutex<LogStore>>,
 ) {
     let cmd = config.cmd.to_owned();
     let name = config.name.to_owned();
@@ -245,9 +245,9 @@ pub fn add_shell_check_job(
 // TODO: Ugly duplication between this and add_shell_check_job.
 pub fn add_shell_metric_job(
     config: &ShellMetricConfig,
+    ls: Arc<Mutex<LogStore>>,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
-    ls: Arc<Mutex<LogStore>>,
 ) {
     let cmd = config.cmd.to_owned();
     let name = config.name.to_owned();
