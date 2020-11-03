@@ -1,13 +1,14 @@
 #[macro_use]
 extern crate log;
 
+use std::sync::{Arc, Mutex};
+
 mod log_store;
 mod metric_store;
 mod notifier;
 pub mod scheduler;
 mod signal;
 
-// pub use to fix compiler dead_code warnings.
 pub use crate::{
     log_store::{Log, LogStore},
     metric_store::MetricStore,
@@ -150,4 +151,192 @@ impl MetricValue {
             _ => None,
         }
     }
+}
+
+pub fn create_shell_checks(
+    check_configs: &[ShellCheckConfig],
+    ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>,
+    sched: &Arc<Mutex<Scheduler>>)
+{
+    for scc in check_configs.iter() {
+        add_shell_check_job(scc,
+                            ms.clone(),
+                            sched.clone(),
+                            ls.clone());
+    }
+}
+
+pub fn create_shell_metrics(
+    metric_configs: &[ShellMetricConfig],
+    ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>,
+    n: &Arc<Mutex<Notifier>>,
+    sched: &Arc<Mutex<Scheduler>>)
+{
+    for smc in metric_configs.iter() {
+        add_shell_metric_job(smc,
+                             ms.clone(),
+                             sched.clone(),
+                             ls.clone());
+        connect_metric_to_notifier(&smc, &ms, &n);
+    }
+}
+
+// TODO: Ugly duplication between this and add_shell_metric_job.
+pub fn add_shell_check_job(
+    config: &ShellCheckConfig,
+    ms: Arc<Mutex<MetricStore>>,
+    sched: Arc<Mutex<Scheduler>>,
+    ls: Arc<Mutex<LogStore>>,
+) {
+    let cmd = config.cmd.to_owned();
+    let name = config.name.to_owned();
+    let j = scheduler::JobDefinition {
+        interval: config.interval,
+        name: String::from(&name),
+        f: Arc::new(Mutex::new(move |_rc| {
+            let mut command = std::process::Command::new("sh");
+            command.arg("-c");
+            command.arg(&cmd);
+
+            // Ugly: calculates UTC time twice, once in run_shell and once here.
+            let start = chrono::Utc::now();
+            let res = run_shell(command);
+            let finish = chrono::Utc::now();
+
+            match res {
+                Ok(res) => {
+                    debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
+                    ms.lock().unwrap().update(&name, DataPoint {
+                        time: chrono::Utc::now(),
+                        val: MetricValue::OkErr(res.ok)
+                    });
+                    ls.lock().unwrap().update(Log {
+                        start: res.start_time,
+                        finish: res.finish_time,
+                        duration: res.duration,
+                        log: res.log,
+                        name: String::from(&name),
+                    });
+                },
+                Err(e) => {
+                    error!("run_shell cmd=`{}' error={}", &cmd, e);
+                    ms.lock().unwrap().update(&name, DataPoint {
+                        time: chrono::Utc::now(),
+                        val: MetricValue::OkErr(OkErr::Err),
+                    });
+                    ls.lock().unwrap().update(Log {
+                        start, finish,
+                        // Susceptible to shifts in time, e.g. leap seconds.
+                        duration: std::time::Duration::from_millis(
+                            (finish - start).num_milliseconds() as u64),
+                        log: format!("Error={}", e),
+                        name: String::from(&name),
+                    });
+                }
+            }
+        })),
+    };
+    sched.lock().unwrap()
+         .add(j);
+}
+
+// TODO: Ugly duplication between this and add_shell_check_job.
+pub fn add_shell_metric_job(
+    config: &ShellMetricConfig,
+    ms: Arc<Mutex<MetricStore>>,
+    sched: Arc<Mutex<Scheduler>>,
+    ls: Arc<Mutex<LogStore>>,
+) {
+    let cmd = config.cmd.to_owned();
+    let name = config.name.to_owned();
+    let j = scheduler::JobDefinition {
+        interval: config.interval,
+        name: String::from(&name),
+        f: Arc::new(Mutex::new(move |_rc| {
+            let mut command = std::process::Command::new("sh");
+            command.arg("-c");
+            command.arg(&cmd);
+
+            // Ugly: calculates UTC time twice, once in run_shell and once here.
+            let start = chrono::Utc::now();
+            let res = run_shell(command);
+            let finish = chrono::Utc::now();
+
+            match res {
+                Ok(res) => {
+                    debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
+                    match res.stdout.trim().parse::<i64>() {
+                        Ok(i) =>
+                            ms.lock().unwrap().update(&name, DataPoint {
+                                time: chrono::Utc::now(),
+                                val: MetricValue::I64(i)
+                            }),
+                        Err(e) =>
+                            error!("Error parsing run_shell stdout: {}", e),
+                    };
+                    ls.lock().unwrap().update(Log {
+                        start: res.start_time,
+                        finish: res.finish_time,
+                        duration: res.duration,
+                        log: res.log,
+                        name: String::from(&name),
+                    });
+                },
+                Err(e) => {
+                    error!("run_shell cmd=`{}' error={}", &cmd, e);
+                    ls.lock().unwrap().update(Log {
+                        start, finish,
+                        // Susceptible to shifts in time, e.g. leap seconds.
+                        duration: std::time::Duration::from_millis(
+                            (finish - start).num_milliseconds() as u64),
+                        log: format!("Error={}", e),
+                        name: String::from(&name),
+                    });
+                }
+            }
+        })),
+    };
+    sched.lock().unwrap()
+         .add(j);
+}
+
+pub fn connect_metric_to_notifier(
+    smc: &ShellMetricConfig,
+    ms: &Arc<Mutex<MetricStore>>,
+    n: &Arc<Mutex<Notifier>>
+) {
+    match &smc.check {
+        MetricCheck::None => (),
+        _ => {
+            let nc = n.clone();
+            let check = smc.check.clone();
+            ms.lock().unwrap()
+                .update_signal_for_one(&smc.name)
+                .connect(move |m| {
+                    let val: i64 = m.latest().unwrap()
+                        .val.as_i64().expect("Only int checks so far");
+                    let ok = check.is_value_ok(val);
+                    debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
+                           m.name(), val, check, ok);
+                    nc.lock().unwrap().update_metric(m.name(), ok);
+                });
+        },
+    };
+}
+
+pub fn connect_all_checks_to_notifier(
+    ms: &Arc<Mutex<MetricStore>>,
+    n: &Arc<Mutex<Notifier>>
+) {
+    let nc = n.clone();
+    ms.lock().unwrap()
+        .update_signal_for_all()
+        .connect(move |m|
+                 {
+                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
+                         nc.lock().unwrap().update_metric(m.name(), *ok);
+                     }
+                 });
 }
