@@ -7,20 +7,27 @@
 
 ## Features
 
-* Show metric checks in green for Ok or red for Err.
+* Show i64 metric checks in green for Ok or red for Err.
 * Push checks (e.g. webhooks for Travis)
+    - Travis makes HTTPS request to a listening HTTPS server (outside firewall)
+    - HTTPS Server turns that HTTPS request into a message down a
+      socket (TCP or WebSocket) to the `monitor` server
+    - `monitor` server handler wakes up and pushes the metric into `MetricStore`.
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
 * View just failing checks.
 * Scroll through list of checks when they get too long.
-* Web front end. [actix-web](https://github.com/actix/actix-web) looks good
-* Distributed architecture.
+* Web or Android front end. [actix-web](https://github.com/actix/actix-web) looks good
+* Distributed architecture libs:
+  [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
   [rsedis](https://github.com/seppo0010/rsedis) and
   [redis-rs](https://github.com/mitsuhiko/redis-rs) could be nice for real-time pubsub.
 
 ## Improvements
 
+* More of a visual separator in the GUI between metrics to help show
+  which check the buttons belong to.
 * `MetricStoreDataSource` should use time for `Point.t`.
 * No visual feedback from using "Force" button. It should be disabled
   when you click it and enabled again when the job finishes.
