@@ -50,12 +50,12 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
             interval: chrono::Duration::seconds(5),
         },
         ShellCheckConfig {
-            name: "apt.upgradable".to_owned(),
+            name: "apt.plato.upgradable".to_owned(),
             cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
             interval: chrono::Duration::minutes(10),
         },
         ShellCheckConfig {
-            name: "mf.apt.upgradable".to_owned(),
+            name: "apt.mf.upgradable".to_owned(),
             cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
             interval: chrono::Duration::minutes(10),
         },
