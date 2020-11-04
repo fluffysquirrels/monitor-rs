@@ -1,8 +1,11 @@
-use crate::Signal;
+use crate::{
+    MetricKey,
+    Signal,
+};
 use std::collections::BTreeMap;
 
 pub struct LogStore {
-    logs: BTreeMap<String, Log>,
+    logs: BTreeMap<MetricKey, Log>,
     update_signal: Signal<Log>,
 }
 
@@ -12,7 +15,7 @@ pub struct Log {
     pub finish: chrono::DateTime<chrono::Utc>,
     pub duration: std::time::Duration,
     pub log: String,
-    pub name: String,
+    pub key: MetricKey,
 }
 
 impl LogStore {
@@ -24,13 +27,12 @@ impl LogStore {
     }
 
     pub fn update(&mut self, log: Log) {
-        let log2 = log.clone();
-        self.logs.insert(log.name.clone(), log);
-        self.update_signal.raise(log2);
+        self.logs.insert(log.key.clone(), log.clone());
+        self.update_signal.raise(log);
     }
 
-    pub fn get(&self, name: &str) -> Option<&Log> {
-        self.logs.get(name)
+    pub fn get(&self, key: &MetricKey) -> Option<&Log> {
+        self.logs.get(key)
     }
 
     pub fn update_signal(&mut self) -> &mut Signal<Log> {

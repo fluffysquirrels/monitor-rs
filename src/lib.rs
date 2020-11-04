@@ -1,8 +1,6 @@
 #[macro_use]
 extern crate log;
 
-use std::sync::{Arc, Mutex};
-
 mod log_store;
 mod metric_store;
 mod notifier;
@@ -16,12 +14,42 @@ pub use crate::{
     scheduler::Scheduler,
     signal::Signal,
 };
+
 use process_control::{ChildExt, Timeout};
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OkErr {
     Ok,
     Err,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct MetricKey {
+    pub name: String,
+    pub host: Host,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub enum Host {
+    Local,
+    Remote(RemoteHost),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+pub struct RemoteHost {
+    pub name: String,
+}
+
+impl MetricKey {
+    pub fn display_name(&self) -> String {
+        format!("{}@{}",
+                self.name,
+                match &self.host {
+                    Host::Local => "local",
+                    Host::Remote(RemoteHost { name: hostname }) => &hostname,
+                })
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -205,10 +233,14 @@ pub fn add_shell_check_job(
             let res = run_shell(command);
             let finish = chrono::Utc::now();
 
+            let key = MetricKey {
+                name: name.clone(),
+                host: Host::Local,
+            };
             match res {
                 Ok(res) => {
                     debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
-                    ms.lock().unwrap().update(&name, DataPoint {
+                    ms.lock().unwrap().update(&key, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(res.ok)
                     });
@@ -217,12 +249,12 @@ pub fn add_shell_check_job(
                         finish: res.finish_time,
                         duration: res.duration,
                         log: res.log,
-                        name: String::from(&name),
+                        key: key.clone(),
                     });
                 },
                 Err(e) => {
                     error!("run_shell cmd=`{}' error={}", &cmd, e);
-                    ms.lock().unwrap().update(&name, DataPoint {
+                    ms.lock().unwrap().update(&key, DataPoint {
                         time: chrono::Utc::now(),
                         val: MetricValue::OkErr(OkErr::Err),
                     });
@@ -232,7 +264,7 @@ pub fn add_shell_check_job(
                         duration: std::time::Duration::from_millis(
                             (finish - start).num_milliseconds() as u64),
                         log: format!("Error={}", e),
-                        name: String::from(&name),
+                        key: key.clone(),
                     });
                 }
             }
@@ -264,12 +296,16 @@ pub fn add_shell_metric_job(
             let res = run_shell(command);
             let finish = chrono::Utc::now();
 
+            let key = MetricKey {
+                name: name.clone(),
+                host: Host::Local,
+            };
             match res {
                 Ok(res) => {
                     debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
                     match res.stdout.trim().parse::<i64>() {
                         Ok(i) =>
-                            ms.lock().unwrap().update(&name, DataPoint {
+                            ms.lock().unwrap().update(&key, DataPoint {
                                 time: chrono::Utc::now(),
                                 val: MetricValue::I64(i)
                             }),
@@ -281,7 +317,7 @@ pub fn add_shell_metric_job(
                         finish: res.finish_time,
                         duration: res.duration,
                         log: res.log,
-                        name: String::from(&name),
+                        key: key.clone(),
                     });
                 },
                 Err(e) => {
@@ -292,7 +328,7 @@ pub fn add_shell_metric_job(
                         duration: std::time::Duration::from_millis(
                             (finish - start).num_milliseconds() as u64),
                         log: format!("Error={}", e),
-                        name: String::from(&name),
+                        key: key.clone(),
                     });
                 }
             }
@@ -313,14 +349,17 @@ pub fn connect_metric_to_notifier(
             let nc = n.clone();
             let check = smc.check.clone();
             ms.lock().unwrap()
-                .update_signal_for_one(&smc.name)
+                .update_signal_for_one(&MetricKey {
+                    name: smc.name.clone(),
+                    host: Host::Local,
+                })
                 .connect(move |m| {
                     let val: i64 = m.latest().unwrap()
                         .val.as_i64().expect("Only int checks so far");
                     let ok = check.is_value_ok(val);
                     debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
-                           m.name(), val, check, ok);
-                    nc.lock().unwrap().update_metric(m.name(), ok);
+                           m.key().display_name(), val, check, ok);
+                    nc.lock().unwrap().update_metric(&m.key().display_name(), ok);
                 });
         },
     };
@@ -336,7 +375,7 @@ pub fn connect_all_checks_to_notifier(
         .connect(move |m|
                  {
                      if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
-                         nc.lock().unwrap().update_metric(m.name(), *ok);
+                         nc.lock().unwrap().update_metric(&m.key().display_name(), *ok);
                      }
                  });
 }

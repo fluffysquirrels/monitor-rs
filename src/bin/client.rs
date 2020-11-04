@@ -6,8 +6,10 @@ use monitor::{
     create_shell_checks,
     create_shell_metrics,
     DataPoint,
+    Host,
     LogStore,
     MetricCheck,
+    MetricKey,
     MetricStore,
     MetricValue,
     Notifier,
@@ -29,7 +31,7 @@ use std::{
 
 #[derive(Clone)]
 struct Ui {
-    metrics: BTreeMap<String, MetricUi>,
+    metrics: BTreeMap<MetricKey, MetricUi>,
 }
 
 #[derive(Clone)]
@@ -114,10 +116,10 @@ egrep '^\"passed\"$'",
 fn main() {
     env_logger::init();
 
+    let ls = Arc::new(Mutex::new(LogStore::new()));
     let ms = Arc::new(Mutex::new(MetricStore::new()));
     let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
-    let ls = Arc::new(Mutex::new(LogStore::new()));
 
     let check_configs = shell_check_configs();
     create_shell_checks(&check_configs, &ls, &ms, &sched);
@@ -182,16 +184,18 @@ fn build_ui(
         .parent(&window)
         .build();
 
-    let mut metrics = BTreeMap::<String,MetricUi>::new();
+    let mut metrics = BTreeMap::<MetricKey, MetricUi>::new();
 
     for config in check_configs.iter() {
-        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics_box, &gdk_window, &config.name);
-        metrics.insert(String::from(&config.name), metric_ui);
+        let key = MetricKey { name: config.name.clone(), host: Host::Local };
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+        metrics.insert(key, metric_ui);
     }
 
     for config in metric_configs.iter() {
-        let metric_ui = ui_for_metric(&ms, &sched, &ls, &metrics_box, &gdk_window, &config.name);
-        metrics.insert(String::from(&config.name), metric_ui);
+        let key = MetricKey { name: config.name.clone(), host: Host::Local };
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+        metrics.insert(key, metric_ui);
     }
 
     window.show_all();
@@ -220,7 +224,7 @@ fn build_ui(
 
         let uic = ui.clone();
         rx.attach(Some(&ui_thread), move |log| {
-            let metric = uic.metrics.get(&log.name);
+            let metric = uic.metrics.get(&log.key);
             if let Some(metric) = metric {
                 metric.label_status.set_tooltip_text(Some(&log.log));
             }
@@ -244,7 +248,7 @@ fn build_ui(
         let uic = ui.clone();
         rx.attach(Some(&ui_thread), move |metric| {
             if let Some(DataPoint { val, .. }) = metric.latest() {
-                let ui_metric = uic.metrics.get(metric.name());
+                let ui_metric = uic.metrics.get(metric.key());
                 if let Some(ui_metric) = ui_metric {
                     if let MetricValue::OkErr(ok) = val {
                         ui_metric.label_status.set_markup(match ok {
@@ -262,12 +266,12 @@ fn build_ui(
 }
 
 fn ui_for_metric<C>(
-    ms: &Arc<Mutex<MetricStore>>,
-    sched: &Arc<Mutex<Scheduler>>,
-    _ls: &Arc<Mutex<LogStore>>,
     container: &C,
     gdk_window: &gdk::Window,
-    metric_name: &str
+    metric_key: &MetricKey,
+    _ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>,
+    sched: &Arc<Mutex<Scheduler>>,
 ) -> MetricUi
     where C: IsA<gtk::Container> + IsA<gtk::Widget>
 {
@@ -276,7 +280,7 @@ fn ui_for_metric<C>(
         .orientation(gtk::Orientation::Horizontal)
         .build();
     let _label = gtk::LabelBuilder::new()
-        .label(metric_name)
+        .label(&metric_key.display_name())
         .parent(&label_box)
         .build();
     let label_status = gtk::LabelBuilder::new()
@@ -296,9 +300,9 @@ fn ui_for_metric<C>(
         .halign(gtk::Align::Start)
         .build();
     let sched = sched.clone();
-    let metric_name_clone = metric_name.to_owned();
+    let metric_key_clone = metric_key.to_owned();
     force_btn.connect_clicked(move |_btn| {
-        sched.lock().unwrap().force_run(&metric_name_clone);
+        sched.lock().unwrap().force_run(&metric_key_clone.display_name());
     });
 
     let show_graph_btn = gtk::ButtonBuilder::new()
@@ -308,7 +312,7 @@ fn ui_for_metric<C>(
         .build();
 
     let config = rt_graph::ConfigBuilder::default()
-        .data_source(MetricStoreDataSource::new(metric_name, ms.clone()))
+        .data_source(MetricStoreDataSource::new(metric_key, ms.clone()))
         .base_zoom_x(1.0)
         .max_zoom_x(0.1)
         .graph_height(100)
@@ -346,7 +350,7 @@ fn ui_for_metric<C>(
 }
 
 struct MetricStoreDataSource {
-    metric_name: String,
+    metric_key: MetricKey,
     ms: Arc<Mutex<MetricStore>>,
     last: Option<DataPoint>,
     t: u32,
@@ -355,15 +359,15 @@ struct MetricStoreDataSource {
 impl std::fmt::Debug for MetricStoreDataSource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         f.debug_struct("MetricStoreDataSource")
-            .field("metric_name", &self.metric_name)
+            .field("metric_key", &self.metric_key)
             .finish()
     }
 }
 
 impl MetricStoreDataSource {
-    fn new(metric_name: &str, ms: Arc<Mutex<MetricStore>>) -> MetricStoreDataSource {
+    fn new(metric_key: &MetricKey, ms: Arc<Mutex<MetricStore>>) -> MetricStoreDataSource {
         MetricStoreDataSource {
-            metric_name: String::from(metric_name),
+            metric_key: metric_key.clone(),
             ms,
             t: 1,
             last: None,
@@ -373,7 +377,7 @@ impl MetricStoreDataSource {
 
 impl rt_graph::DataSource for MetricStoreDataSource {
     fn get_data(&mut self) -> Result<Vec<rt_graph::Point>, rt_graph::Error> {
-        let m = self.ms.lock().unwrap().query_one(&self.metric_name);
+        let m = self.ms.lock().unwrap().query_one(&self.metric_key);
         let res = match m {
             Some(m) => {
                 let dp = m.latest();

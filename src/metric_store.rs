@@ -1,5 +1,6 @@
 use crate::{
     DataPoint,
+    MetricKey,
     Signal,
 };
 use std::collections::BTreeMap;
@@ -7,17 +8,17 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug)]
 pub struct Metric {
     latest: Option<DataPoint>,
-    name: String,
+    key: MetricKey,
 }
 
 struct MetricState {
     latest: Option<DataPoint>,
-    name: String,
+    key: MetricKey,
     update_signal: Signal<Metric>,
 }
 
 pub struct MetricStore {
-    metrics: BTreeMap<String, MetricState>,
+    metrics: BTreeMap<MetricKey, MetricState>,
     update_signal_for_all: Signal<Metric>,
 }
 
@@ -26,8 +27,8 @@ impl Metric {
         self.latest.as_ref()
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn key(&self) -> &MetricKey {
+        &self.key
     }
 }
 
@@ -39,9 +40,9 @@ impl MetricStore {
         }
     }
 
-    pub fn update(&mut self, metric_name: &str, point: DataPoint) {
+    pub fn update(&mut self, key: &MetricKey, point: DataPoint) {
         let metric = {
-            let mut metric_state = self.get_or_insert_metric(metric_name);
+            let mut metric_state = self.get_or_insert_metric(key);
             metric_state.latest = Some(point);
             let metric = metric_state.as_metric();
             metric_state.update_signal.raise(metric.clone());
@@ -56,13 +57,13 @@ impl MetricStore {
     }
 
     /// Returns a signal to listen to updates for one metric
-    pub fn update_signal_for_one(&mut self, metric_name: &str) -> &mut Signal<Metric> {
-        let metric = self.get_or_insert_metric(metric_name);
+    pub fn update_signal_for_one(&mut self, key: &MetricKey) -> &mut Signal<Metric> {
+        let metric = self.get_or_insert_metric(key);
         &mut metric.update_signal
     }
 
-    pub fn query_one(&self, metric_name: &str) -> Option<Metric> {
-        self.metrics.get(metric_name)
+    pub fn query_one(&self, key: &MetricKey) -> Option<Metric> {
+        self.metrics.get(key)
                     .map(|ms| ms.as_metric())
     }
 
@@ -72,16 +73,16 @@ impl MetricStore {
                     .collect::<Vec<Metric>>()
     }
 
-    fn get_or_insert_metric(&mut self, metric_name: &str) -> &mut MetricState {
-        self.metrics.entry(String::from(metric_name))
-                    .or_insert(MetricState::named(metric_name))
+    fn get_or_insert_metric(&mut self, key: &MetricKey) -> &mut MetricState {
+        self.metrics.entry(key.clone())
+                    .or_insert(MetricState::with_key(key))
     }
 }
 
 impl MetricState {
-    fn named(name: &str) -> MetricState {
+    fn with_key(key: &MetricKey) -> MetricState {
         MetricState {
-            name: name.to_owned(),
+            key: key.clone(),
             latest: None,
             update_signal: Signal::new(),
         }
@@ -90,7 +91,7 @@ impl MetricState {
     fn as_metric(&self) -> Metric {
         Metric {
             latest: self.latest.clone(),
-            name: self.name.clone(),
+            key: self.key.clone(),
         }
     }
 }
