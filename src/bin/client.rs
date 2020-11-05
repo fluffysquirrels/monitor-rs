@@ -2,6 +2,7 @@
 extern crate log;
 
 use monitor::{
+    add_remote_sync_job,
     connect_all_checks_to_notifier,
     create_shell_checks,
     create_shell_metrics,
@@ -14,6 +15,8 @@ use monitor::{
     MetricValue,
     Notifier,
     OkErr,
+    RemoteHost,
+    RemoteSyncConfig,
     scheduler::Scheduler,
     ShellCheckConfig,
     ShellMetricConfig,
@@ -114,7 +117,10 @@ egrep '^\"passed\"$'",
 }
 
 fn main() {
-    env_logger::init();
+    env_logger::Builder::new()
+        .parse_filters(&std::env::var("RUST_LOG").unwrap_or("info".to_owned()))
+        .format_timestamp_micros()
+        .init();
 
     let ls = Arc::new(Mutex::new(LogStore::new()));
     let ms = Arc::new(Mutex::new(MetricStore::new()));
@@ -128,6 +134,9 @@ fn main() {
     create_shell_metrics(&metric_configs, &ls, &ms, &n, &sched);
 
     connect_all_checks_to_notifier(&ms, &n);
+    add_remote_sync_job(&RemoteSyncConfig {
+        url: "http://mf:8080".to_owned(),
+    }, &ms, &sched);
 
     sched.lock().unwrap().spawn();
 
@@ -198,6 +207,18 @@ fn build_ui(
         metrics.insert(key, metric_ui);
     }
 
+    // for config in remote_configs {
+    {
+        let key = MetricKey {
+            name: "zfs.mf.healthy".to_owned(),
+            host: Host::Remote(RemoteHost {
+                name: "MicroFridge".to_owned()
+            })
+        };
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+        metrics.insert(key, metric_ui);
+    }
+    // }
     window.show_all();
     for mui in metrics.values() {
         mui.graph.hide();
@@ -302,7 +323,11 @@ fn ui_for_metric<C>(
     let sched = sched.clone();
     let metric_key_clone = metric_key.to_owned();
     force_btn.connect_clicked(move |_btn| {
-        sched.lock().unwrap().force_run(&metric_key_clone.display_name());
+        if let Host::Local = metric_key_clone.host {
+            sched.lock().unwrap().force_run(&metric_key_clone.name);
+        } else {
+            error!("Forcing remote checks is not yet supported");
+        }
     });
 
     let show_graph_btn = gtk::ButtonBuilder::new()
@@ -393,7 +418,7 @@ impl rt_graph::DataSource for MetricStoreDataSource {
                                     MetricValue::OkErr(OkErr::Ok)  => 50000,
                                     MetricValue::OkErr(OkErr::Err) => 10000,
                                     MetricValue::I64(i) => *i as u16, // TODO: Handle overflow
-                                    MetricValue::_F64(_f) => unimplemented!(),
+                                    MetricValue::F64(_f) => unimplemented!(),
                                 },
                             ]}]
                         } else {

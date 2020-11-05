@@ -7,6 +7,10 @@ mod notifier;
 pub mod scheduler;
 mod signal;
 
+pub mod collector {
+    tonic::include_proto!("collector");
+}
+
 pub use crate::{
     log_store::{Log, LogStore},
     metric_store::MetricStore,
@@ -15,6 +19,7 @@ pub use crate::{
     signal::Signal,
 };
 
+use chrono::TimeZone;
 use process_control::{ChildExt, Timeout};
 use std::sync::{Arc, Mutex};
 
@@ -56,7 +61,7 @@ impl MetricKey {
 pub enum MetricValue {
     OkErr(OkErr),
     I64(i64),
-    _F64(f64),
+    F64(f64),
 }
 
 #[derive(Clone, Debug)]
@@ -141,9 +146,9 @@ pub fn run_shell(mut cmd: std::process::Command) -> Result<RunShellResult, std::
     log.push_str(&format!("exit_status: {:?}\n", res.status));
     log.push_str(&format!("duration: {}ms\n", duration.as_millis()));
     log.push_str(&format!("start: {}\n",
-                          start_utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)));
+                          start_utc.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)));
     log.push_str(&format!("finish: {}",
-                          finish_utc.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)));
+                          finish_utc.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)));
 
     let res = RunShellResult {
         log: log,
@@ -167,7 +172,7 @@ impl std::fmt::Display for MetricValue {
             MetricValue::OkErr(OkErr::Ok) => f.write_str("Ok"),
             MetricValue::OkErr(OkErr::Err) => f.write_str("Err"),
             MetricValue::I64(int) => f.write_str(&format!("{}", int)),
-            MetricValue::_F64(float) => f.write_str(&format!("{}", float)),
+            MetricValue::F64(float) => f.write_str(&format!("{}", float)),
         }
     }
 }
@@ -378,4 +383,81 @@ pub fn connect_all_checks_to_notifier(
                          nc.lock().unwrap().update_metric(&m.key().display_name(), *ok);
                      }
                  });
+}
+
+#[derive(Clone)]
+pub struct RemoteSyncConfig {
+    // TODO: Use a more specific type here.
+    pub url: String,
+}
+
+pub fn add_remote_sync_job(
+    config: &RemoteSyncConfig,
+    ms: &Arc<Mutex<MetricStore>>,
+    sched: &Arc<Mutex<Scheduler>>)
+{
+    // TODO: Cache connection and re-use between invocations.
+
+    let config = config.clone();
+    let ms = ms.clone();
+    let j = scheduler::JobDefinition {
+        interval: chrono::Duration::seconds(5),
+        name: format!("remote-sync.{}", &config.url),
+        f: Arc::new(Mutex::new(move |_rc| {
+            debug!("Remote sync connecting endpoint url: {}", &config.url);
+            let endpoint = tonic::transport::Endpoint::from_shared(config.url.clone()).unwrap();
+            let config = config.clone();
+            let ms = ms.clone();
+            let fut = async move {
+                let mut client = collector::collector_client::CollectorClient::connect(endpoint)
+                    .await?;
+                debug!("Remote sync polling `{}'", config.url);
+                let req = collector::GetMetricsRequest {};
+                let metrics = client.get_metrics(req).await?;
+                trace!("Remote sync got metrics");
+                trace!("metrics: {:#?}", metrics);
+                let metrics = metrics.into_inner().metrics.iter()
+                                     .map(|m| metric_store::Metric::from_protobuf(m))
+                                     .collect::<Result<Vec<metric_store::Metric>, String>>()?;
+                debug!("Remote sync unmarshalled metrics");
+                trace!("metrics: {:#?}", metrics);
+
+                { // Scope the lock on ms.
+                    let mut msl = ms.lock().unwrap();
+                    for m in metrics.iter() {
+                        if let Some(latest) = m.latest() {
+                            msl.update(&m.key(), latest.clone())
+                        }
+                    }
+                }
+                Ok(())
+            };
+            // Spinning up a tokio runtime takes ~300us, so caching a
+            // runtime somewhere might be nice but isn't required.
+            let mut rt = tokio::runtime::Runtime::new().unwrap();
+            let res: Result<(), Box<dyn std::error::Error>> = rt.block_on(fut);
+            if let Err(e) = res {
+                error!("Remote sync error = {}", e);
+            }
+        }))
+    };
+
+    sched.lock().unwrap().add(j);
+}
+
+fn chrono_datetime_from_protobuf(t: &collector::Time
+) -> Result<chrono::DateTime<chrono::Utc>, String> {
+    let epoch = chrono::Utc.ymd(1970, 1, 1).and_hms(0, 0, 0);
+    Ok(epoch
+       + chrono::Duration::milliseconds(t.epoch_millis)
+       + chrono::Duration::nanoseconds(t.nanos as i64)
+    )
+}
+
+fn chrono_datetime_to_protobuf(t: &chrono::DateTime<chrono::Utc>
+) -> Result<collector::Time, String> {
+    Ok(collector::Time {
+        epoch_millis: t.timestamp_millis(),
+        nanos: t.timestamp_subsec_nanos() % 1_000_000,
+    })
 }

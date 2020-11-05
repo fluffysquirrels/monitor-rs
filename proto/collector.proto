@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package collector;
+
+service Collector {
+  rpc GetMetrics (GetMetricsRequest) returns (MetricsReply) {}
+}
+
+message GetMetricsRequest {}
+
+message MetricsReply {
+  repeated Metric metrics = 1;
+}
+
+message Metric {
+  string name = 1;
+  Host from_host = 2;
+  DataPoint latest = 3;
+}
+
+message Host {
+  string name = 1;
+}
+
+message DataPoint {
+  Time time = 1;
+  oneof value {
+    bool ok = 2;
+    int64 i64 = 3;
+    double f64 = 4;
+  }
+}
+
+message Time {
+  sfixed64 epoch_millis = 1;
+  fixed32 nanos = 2;
+}

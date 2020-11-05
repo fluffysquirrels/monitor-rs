@@ -4,10 +4,25 @@
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
+* Lots of `unwrap()`s that should return errors.
 
 ## Features
 
+* Remote check syncing over gRPC
+    - Update local MetricStore with synced metrics.
+        - Don't raise update signal when we update with a stale value.
+    - Notify on all synced metrics.
+    - Show synced metrics in UI.
+    - Show status of syncing in checks
+    - Run collector at boot
+    - collector build and deploy script
+    - Force remote checks and metrics
+    - Retrieve remote logs
+    - Cache connection and re-use between invocations.
+    - Mutual TLS
+    - Real-time streaming instead of polling
 * Show i64 metric checks in green for Ok or red for Err.
+* View old logs
 * Push checks (e.g. webhooks for Travis)
     - Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     - HTTPS Server turns that HTTPS request into a message down a
@@ -47,7 +62,7 @@
       of implementing internal mutability itself than a Mutex, e.g. a
       concurrent data structure.
     - External wrappers give the user the choice about how to control the struct
-    - Internal wrappers are probably easier to use
+    - Internal wrappers are easier to use: consumers can screw up the locking
 
 ## `shell_check` timeout notes
 

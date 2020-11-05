@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eux;
+
+# Compute script directory.
+readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
+
+cd "${package_dir}";
+ssh mf killall collector;
+cargo build --release --bin collector;
+scp target/release/collector mf:/home/alex/tmp/collector;
+ssh mf 'RUST_LOG="collector=trace,monitor=debug" /home/alex/tmp/collector';
