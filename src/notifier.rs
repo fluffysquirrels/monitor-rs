@@ -41,7 +41,7 @@ impl Notifier {
             let res = notify_rust::Notification::new()
                 .summary("monitor")
                 .body(&format!("metric `{}` is {:?}", metric.name, metric.last_value))
-                .timeout(notify_rust::Timeout::Milliseconds(2000))
+                .timeout(notify_rust::Timeout::Milliseconds(5 * 1000))
                 .show();
             metric.last_notification = Some(chrono::Utc::now());
             if let Err(e) = res {
