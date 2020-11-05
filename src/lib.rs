@@ -57,14 +57,14 @@ impl MetricKey {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum MetricValue {
     OkErr(OkErr),
     I64(i64),
     F64(f64),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct DataPoint {
     pub time: chrono::DateTime<chrono::Utc>,
     pub val: MetricValue,

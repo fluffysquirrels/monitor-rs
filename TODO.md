@@ -9,8 +9,6 @@
 ## Features
 
 * Remote check syncing over gRPC
-    - Update local MetricStore with synced metrics.
-        - Don't raise update signal when we update with a stale value.
     - Notify on all synced metrics.
     - Show synced metrics in UI.
     - Show status of syncing in checks

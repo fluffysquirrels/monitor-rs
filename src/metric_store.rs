@@ -49,14 +49,17 @@ impl MetricStore {
 
     pub fn update(&mut self, key: &MetricKey, point: DataPoint) {
         trace!("update key=`{}', point={:?}", key.display_name(), point);
-        let metric = {
-            let mut metric_state = self.get_or_insert_metric(key);
-            metric_state.latest = Some(point);
+        let mut metric_state =
+            self.metrics.entry(key.clone())
+                .or_insert(MetricState::with_key(key));
+        let old_value = metric_state.latest.clone();
+        metric_state.latest = Some(point);
+        if old_value != metric_state.latest {
+            trace!("raising signals for key=`{}'", key.display_name());
             let metric = metric_state.as_metric();
             metric_state.update_signal.raise(metric.clone());
-            metric
-        };
-        self.update_signal_for_all.raise(metric);
+            self.update_signal_for_all.raise(metric);
+        }
     }
 
     /// Returns a signal to listen to updates for all metrics.
