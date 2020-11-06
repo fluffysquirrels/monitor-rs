@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -eux;
+
+# Compute script directory.
+readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
+
+cd "${package_dir}";
+cargo build --release --bin collector;
+ssh mf "sudo /bin/systemctl stop monitor-collector.service"
+scp target/release/collector mf:/usr/local/lib/monitor/collector;
+ssh mf "sudo /bin/systemctl start monitor-collector.service &&
+        sleep 1 &&
+        /bin/systemctl status monitor-collector.service";

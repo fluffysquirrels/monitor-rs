@@ -1,0 +1,11 @@
+[Unit]
+Description=A metric collector and server
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/lib/monitor/collector
+User=monitor-collector
+
+[Install]
+WantedBy=multi-user.target

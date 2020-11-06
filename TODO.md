@@ -13,11 +13,9 @@
     - Show synced metrics in UI.
         - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
     - Show status of syncing in checks
-    - Run collector at boot
     - Run collector on f1
         - Pre-requisite: read checks from config file
         - Needs mutual TLS
-    - collector build and deploy script
     - Force remote checks and metrics
     - Retrieve remote logs
     - Cache connection and re-use between invocations.
@@ -87,3 +85,30 @@
 * nix crate support for signals:
     - https://docs.rs/nix/0.19.0/nix/sys/signal/index.html
     - https://docs.rs/nix/0.19.0/nix/sys/signalfd/index.html
+
+## Deploy new collector notes
+
+```
+sudo adduser --system --disabled-password --no-create-home monitor-collector
+sudo mkdir -p /usr/local/lib/monitor
+sudo setfacl -m user:alex:rwx /usr/local/lib/monitor
+```
+
+Copy systemd service `${REPO}/conf/monitor-collector.service` to
+target at `/usr/local/lib/systemd/system/monitor-collector.service`
+make sure it is owned by root and not world writable
+```
+sudo systemctl daemon-reload
+sudo systemctl enable monitor-collector.service
+sudo systemctl restart monitor-collector.service
+sleep 1
+sudo systemctl status monitor-collector.service
+```
+
+Put this in sudoers, replacing $(hostname)
+```
+# Allow alex to run, stop, or restart the monitor-collector service
+alex $(hostname)=(root) NOPASSWD: /bin/systemctl restart monitor-collector.service, /bin/systemctl stop monitor-collector.service, /bin/systemctl start monitor-collector.service
+```
+
+Now use `${REPO}/bin/deploy_collectors`
