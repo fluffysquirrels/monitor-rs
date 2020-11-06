@@ -501,7 +501,7 @@ pub fn spawn_remote_sync_job_streaming(config: &RemoteSyncConfig, ms: &Arc<Mutex
                                 let metric =
                                     match crate::metric_store::Metric::from_protobuf(&metric) {
                                         Err(e) => {
-                                            error!("remote-sync converting protobuf: {}", e);
+                                            error!("remote-sync error converting protobuf: {}", e);
                                             continue 'next_message;
                                         }
                                         Ok(m) => m,
