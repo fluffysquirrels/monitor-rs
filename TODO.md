@@ -2,23 +2,31 @@
 
 ## Bugs
 
+* Implement stream disconnection (in signal and in stream_metrics)
+
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Lots of `unwrap()`s that should return errors.
+* Lots of `unwrap()`s that should return errors, use clippy.
 
 ## Features
 
 * Remote check syncing over gRPC
     - Notify on all synced metrics.
     - Show synced metrics in UI.
+        - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
     - Show status of syncing in checks
     - Run collector at boot
+    - Run collector on f1
+        - Pre-requisite: read checks from config file
+        - Needs mutual TLS
     - collector build and deploy script
     - Force remote checks and metrics
     - Retrieve remote logs
     - Cache connection and re-use between invocations.
     - Mutual TLS
     - Real-time streaming instead of polling
+        - Implement disconnection (in signal and in stream_metrics)
+    - What happens when the collector or client is overloaded? How would we shed load?
 * Show i64 metric checks in green for Ok or red for Err.
 * View old logs
 * Push checks (e.g. webhooks for Travis)

@@ -2,7 +2,7 @@
 extern crate log;
 
 use monitor::{
-    add_remote_sync_job,
+    add_remote_sync_job_polling,
     connect_all_checks_to_notifier,
     create_shell_checks,
     create_shell_metrics,
@@ -20,6 +20,7 @@ use monitor::{
     scheduler::Scheduler,
     ShellCheckConfig,
     ShellMetricConfig,
+    spawn_remote_sync_job_streaming,
 };
 use gio::prelude::*;
 use glib;
@@ -134,9 +135,12 @@ fn main() {
     create_shell_metrics(&metric_configs, &ls, &ms, &n, &sched);
 
     connect_all_checks_to_notifier(&ms, &n);
-    add_remote_sync_job(&RemoteSyncConfig {
+
+    let sync_config = RemoteSyncConfig {
         url: "http://mf:8080".to_owned(),
-    }, &ms, &sched);
+    };
+    //add_remote_sync_job_polling(&sync_config, &ms, &sched);
+    spawn_remote_sync_job_streaming(&sync_config, &ms);
 
     sched.lock().unwrap().spawn();
 

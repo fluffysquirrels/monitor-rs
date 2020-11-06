@@ -4,9 +4,12 @@ package collector;
 
 service Collector {
   rpc GetMetrics (GetMetricsRequest) returns (MetricsReply) {}
+  rpc StreamMetrics (StreamMetricsRequest) returns (stream Metric) {}
 }
 
 message GetMetricsRequest {}
+
+message StreamMetricsRequest {}
 
 message MetricsReply {
   repeated Metric metrics = 1;

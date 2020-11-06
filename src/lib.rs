@@ -391,7 +391,7 @@ pub struct RemoteSyncConfig {
     pub url: String,
 }
 
-pub fn add_remote_sync_job(
+pub fn add_remote_sync_job_polling(
     config: &RemoteSyncConfig,
     ms: &Arc<Mutex<MetricStore>>,
     sched: &Arc<Mutex<Scheduler>>)
@@ -443,6 +443,75 @@ pub fn add_remote_sync_job(
     };
 
     sched.lock().unwrap().add(j);
+}
+
+pub fn spawn_remote_sync_job_streaming(config: &RemoteSyncConfig, ms: &Arc<Mutex<MetricStore>>) {
+    let config = config.clone();
+    let ms = ms.clone();
+    std::thread::Builder::new()
+        .name(format!("remote-sync {}", config.url))
+        .spawn(move || {
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                debug!("Remote sync connecting endpoint url: {}", &config.url);
+                let endpoint =
+                    tonic::transport::Endpoint::from_shared(config.url.clone()).unwrap();
+                'retry_all: loop {
+                    let client =
+                        collector::collector_client::CollectorClient::connect(endpoint.clone())
+                        .await;
+                    let mut client = match client {
+                        Err(e) => {
+                            error!("remote-sync connect error: {}", e);
+                            tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+                            continue 'retry_all;
+                        },
+                        Ok(c) => c,
+                    };
+                    debug!("Remote sync connected `{}'", config.url);
+                    let req = collector::StreamMetricsRequest {};
+                    let stream = client.stream_metrics(req).await;
+                    let stream = match stream {
+                        Err(e) => {
+                            error!("remote-sync stream_metrics error: {}", e);
+                            tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+                            continue 'retry_all;
+                        },
+                        Ok(s) => s,
+                    };
+                    let mut stream = stream.into_inner();
+                    'next_message: loop {
+                        match stream.message().await {
+                            Err(e) => {
+                                error!("remote-sync message() error: {}", e);
+                                tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+                                continue 'retry_all;
+                            }
+                            Ok(None) => {
+                                error!("remote-sync message() was None, stream should be infinte");
+                                tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+                                continue 'retry_all;
+                            }
+                            Ok(Some(metric)) => {
+                                let metric =
+                                    match crate::metric_store::Metric::from_protobuf(&metric) {
+                                        Err(e) => {
+                                            error!("remote-sync converting protobuf: {}", e);
+                                            continue 'next_message;
+                                        }
+                                        Ok(m) => m,
+                                    };
+                                debug!("remote-sync got a metric key=`{}'",
+                                       metric.key().display_name());
+                                if let Some(latest) = metric.latest() {
+                                    ms.lock().unwrap()
+                                      .update(&metric.key(), latest.clone())
+                                }
+                            },
+                        };
+                    }
+                }
+            });
+        }).unwrap();
 }
 
 fn chrono_datetime_from_protobuf(t: &collector::Time
