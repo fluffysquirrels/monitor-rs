@@ -1438,6 +1438,8 @@ dependencies = [
 [[package]]
 name = "rt-graph"
 version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70888c836666a53bb12391aae60e1960f970893060b5aaffe908e7692621f674"
 dependencies = [
  "cairo-rs",
  "derive_builder",
