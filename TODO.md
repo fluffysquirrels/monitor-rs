@@ -9,10 +9,11 @@
 ## Features
 
 * Remote check syncing over gRPC
+    - Show status of syncing in checks
+    - Migrate more mf jobs to collector
     - Notify on all synced metrics.
     - Show synced metrics in UI.
         - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
-    - Show status of syncing in checks
     - Run collector on f1
         - Pre-requisite: read checks from config file
         - Needs mutual TLS
@@ -41,7 +42,7 @@
 
 ## Improvements
 
-* metric_store::Metric::as_protobuf sets hostname while encoding: this
+* `metric_store::Metric::as_protobuf` sets hostname while encoding: this
   should probably not be hidden in here.
 * More of a visual separator in the GUI between metrics to help show
   which check the buttons belong to.
