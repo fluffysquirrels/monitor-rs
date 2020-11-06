@@ -45,6 +45,8 @@
 
 ## Improvements
 
+* metric_store::Metric::as_protobuf sets hostname while encoding: this
+  should probably not be hidden in here.
 * More of a visual separator in the GUI between metrics to help show
   which check the buttons belong to.
 * `MetricStoreDataSource` should use time for `Point.t`.

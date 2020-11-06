@@ -153,6 +153,7 @@ impl Metric {
             name: self.key.name.clone(),
             from_host: match &self.key.host {
                 Host::Local => Some(collector::Host{
+                    // TODO: This should probably not be hidden in here.
                     name: hostname::get().unwrap().into_string().unwrap()
                 }),
                 Host::Remote(RemoteHost { name, }) => Some(collector::Host {
