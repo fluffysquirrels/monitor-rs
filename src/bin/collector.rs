@@ -3,6 +3,7 @@ extern crate log;
 
 use monitor::{
     collector::{self, collector_server},
+    Continue,
     create_shell_checks,
     // create_shell_metrics,
     DataPoint,
@@ -124,7 +125,7 @@ impl collector_server::Collector for CollectorService {
             let metric_proto = match metric.as_protobuf() {
                 Err(e) => {
                     error!("stream_metrics: failed to encode as protobuf: {}", e);
-                    return
+                    return Continue::Continue;
                 },
                 Ok(m) => m,
             };
@@ -132,11 +133,14 @@ impl collector_server::Collector for CollectorService {
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) =>
                     error!("stream_metrics: channel full key={}",
                            metric.key().display_name()),
-                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) =>
-                    error!("stream_metrics: channel closed, not implemented yet!"),
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    debug!("stream_metrics: channel closed");
+                    return Continue::Disconnect;
+                }
                 Ok(()) =>
                     trace!("stream_metrics: sent metric key=`{}'", metric.key().display_name()),
             };
+            Continue::Continue
         });
         Ok(tonic::Response::new(rx))
     }

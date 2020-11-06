@@ -2,8 +2,6 @@
 
 ## Bugs
 
-* Implement stream disconnection (in signal and in stream_metrics)
-
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
 * Lots of `unwrap()`s that should return errors, use clippy.
@@ -25,7 +23,7 @@
     - Cache connection and re-use between invocations.
     - Mutual TLS
     - Real-time streaming instead of polling
-        - Implement disconnection (in signal and in stream_metrics)
+        - Add keep-alives to endpoint config.
     - What happens when the collector or client is overloaded? How would we shed load?
 * Show i64 metric checks in green for Ok or red for Err.
 * View old logs

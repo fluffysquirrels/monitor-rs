@@ -4,6 +4,7 @@ extern crate log;
 use monitor::{
     add_remote_sync_job_polling,
     connect_all_checks_to_notifier,
+    Continue,
     create_shell_checks,
     create_shell_metrics,
     DataPoint,
@@ -245,6 +246,7 @@ fn build_ui(
                 Err(_) => error!("LogStore UI channel send error"),
                 Ok(_) => (),
             }
+            Continue::Continue
         });
 
         let uic = ui.clone();
@@ -268,6 +270,7 @@ fn build_ui(
                 Err(_) => error!("MetricStore UI channel send error"),
                 Ok(_) => (),
             }
+            Continue::Continue
         });
 
         let uic = ui.clone();

@@ -12,12 +12,22 @@ pub struct Signal<T: Clone> {
 
 struct Subscription<T> {
     id: SubscriptionId,
-    callback: Box<dyn Fn(T) + Send>,
+    callback: Box<dyn (Fn(T) -> Continue) + Send>,
 }
 
 /// The identifier for a subscription, used to disconnect it when no longer required.
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub struct SubscriptionId(usize);
+
+/// Whether to continue receiving callbacks.
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub enum Continue {
+    /// Continue receiving callbacks.
+    Continue,
+
+    /// Stop receiving callbacks.
+    Disconnect,
+}
 
 impl<T: Clone> Signal<T> {
     /// Construct a new `Signal`.
@@ -34,7 +44,7 @@ impl<T: Clone> Signal<T> {
     /// Returns a SubscriptionId to disconnect the subscription when
     /// no longer required.
     pub fn connect<F>(&mut self, callback: F) -> SubscriptionId
-        where F: (Fn(T)) + Send + 'static
+        where F: (Fn(T) -> Continue) + Send + 'static
     {
         let id = SubscriptionId(self.new_id);
         self.new_id = self.new_id.checked_add(1).expect("No overflow");
@@ -49,9 +59,16 @@ impl<T: Clone> Signal<T> {
     }
 
     /// Notify existing subscribers.
-    pub fn raise(&self, value: T) {
+    pub fn raise(&mut self, value: T) {
+        let mut to_disconnect: Vec<SubscriptionId> = vec![];
         for sub in self.subs.iter() {
-            (sub.callback)(value.clone())
+            let cont = (sub.callback)(value.clone());
+            if cont == Continue::Disconnect {
+                to_disconnect.push(sub.id);
+            }
+        }
+        for sub_id in to_disconnect.into_iter() {
+            self.disconnect(sub_id);
         }
     }
 
@@ -64,11 +81,11 @@ impl<T: Clone> Signal<T> {
 
 #[cfg(test)]
 mod test {
-    use crate::Signal;
+    use super::{Continue, Signal};
     use std::sync::{Arc, Mutex};
 
     #[test]
-    fn signal() {
+    fn signal_manual_disconnect() {
         let mut sig = Signal::new();
 
         let data: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
@@ -78,6 +95,7 @@ mod test {
         let subid = sig.connect(move |v| {
             let mut lock = dc.lock().unwrap();
             *lock = *lock + v;
+            Continue::Continue
         });
         assert_eq!(*data.lock().unwrap(), 0);
 
@@ -104,11 +122,13 @@ mod test {
         let sub1 = sig.connect(move |_v| {
             let mut lock = dc.lock().unwrap();
             *lock = *lock + 1;
+            Continue::Continue
         });
         let dc = data.clone();
         let sub2 = sig.connect(move |_v| {
             let mut lock = dc.lock().unwrap();
             *lock = *lock + 10;
+            Continue::Continue
         });
 
         sig.raise(0);
@@ -124,5 +144,27 @@ mod test {
 
         sig.raise(0);
         assert_eq!(*data.lock().unwrap(), 21);
+    }
+
+    #[test]
+    fn signal_return_value_disconnect() {
+                let mut sig = Signal::new();
+
+        let data: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
+        assert_eq!(*data.lock().unwrap(), 0);
+
+        let dc = data.clone();
+        sig.connect(move |v| {
+            let mut lock = dc.lock().unwrap();
+            *lock = *lock + v;
+            Continue::Disconnect
+        });
+        assert_eq!(*data.lock().unwrap(), 0);
+
+        sig.raise(1);
+        assert_eq!(*data.lock().unwrap(), 1);
+
+        sig.raise(1);
+        assert_eq!(*data.lock().unwrap(), 1);
     }
 }

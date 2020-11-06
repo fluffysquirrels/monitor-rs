@@ -16,7 +16,7 @@ pub use crate::{
     metric_store::MetricStore,
     notifier::Notifier,
     scheduler::Scheduler,
-    signal::Signal,
+    signal::{Continue, Signal},
 };
 
 use chrono::TimeZone;
@@ -365,6 +365,7 @@ pub fn connect_metric_to_notifier(
                     debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
                            m.key().display_name(), val, check, ok);
                     nc.lock().unwrap().update_metric(&m.key().display_name(), ok);
+                    Continue::Continue
                 });
         },
     };
@@ -382,6 +383,7 @@ pub fn connect_all_checks_to_notifier(
                      if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
                          nc.lock().unwrap().update_metric(&m.key().display_name(), *ok);
                      }
+                     Continue::Continue
                  });
 }
 
