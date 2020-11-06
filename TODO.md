@@ -22,8 +22,6 @@
     - Retrieve remote logs
     - Cache connection and re-use between invocations.
     - Mutual TLS
-    - Real-time streaming instead of polling
-        - Add keep-alives to endpoint config.
     - What happens when the collector or client is overloaded? How would we shed load?
 * Show i64 metric checks in green for Ok or red for Err.
 * View old logs

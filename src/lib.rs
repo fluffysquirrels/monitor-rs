@@ -456,7 +456,11 @@ pub fn spawn_remote_sync_job_streaming(config: &RemoteSyncConfig, ms: &Arc<Mutex
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 debug!("Remote sync connecting endpoint url: {}", &config.url);
                 let endpoint =
-                    tonic::transport::Endpoint::from_shared(config.url.clone()).unwrap();
+                    tonic::transport::Endpoint::from_shared(config.url.clone())
+                        .unwrap()
+                        .http2_keep_alive_interval(std::time::Duration::from_secs(60))
+                        .keep_alive_timeout(std::time::Duration::from_secs(15))
+                        .keep_alive_while_idle(true);
                 'retry_all: loop {
                     let client =
                         collector::collector_client::CollectorClient::connect(endpoint.clone())
