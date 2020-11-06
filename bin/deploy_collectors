@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eux;
 
-# Compute script directory.
+# Compute package directory.
 readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
 
 cd "${package_dir}";
