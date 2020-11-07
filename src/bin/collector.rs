@@ -3,6 +3,7 @@ extern crate log;
 
 use monitor::{
     collector::{self, collector_server},
+    config,
     Continue,
     create_shell_checks,
     // create_shell_metrics,
@@ -13,24 +14,8 @@ use monitor::{
     MetricValue,
     OkErr,
     scheduler::Scheduler,
-    ShellCheckConfig,
-    ShellMetricConfig,
 };
 use std::sync::{Arc, Mutex};
-
-fn shell_check_configs() -> Vec<ShellCheckConfig> {
-    vec![
-        ShellCheckConfig {
-            name: "zfs.mf.healthy".to_owned(),
-            cmd: "/sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
-            interval: chrono::Duration::seconds(5),
-        },
-    ]
-}
-
-// fn shell_metric_configs() -> Vec<ShellMetricConfig> {
-//     vec![]
-// }
 
 #[tokio::main]
 async fn main() {
@@ -44,11 +29,10 @@ async fn main() {
     // let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
-    let check_configs = shell_check_configs();
-    create_shell_checks(&check_configs, &ls, &ms, &sched);
+    let config = load_config();
+    trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
 
-    // let metric_configs = shell_metric_configs();
-    // create_shell_metrics(&metric_configs, &ls, &ms, &n, &sched);
+    create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
 
     // connect_all_checks_to_notifier(&ms, &n);
 
@@ -58,12 +42,24 @@ async fn main() {
     let collector_service = CollectorService {
         metric_store: ms.clone(),
     };
-    // let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
     info!("Listening on http://{}", addr);
     tonic::transport::Server::builder()
         .add_service(collector::collector_server::CollectorServer::new(collector_service))
         .serve(addr)
         .await.unwrap();
+}
+
+fn load_config() -> config::Collector {
+    // Panic on error because without config we can't continue.
+
+    let exe_path = std::env::current_exe().expect("Expect to retrieve current exe path");
+    let exe_dir = exe_path.parent().expect("Expect to retrieve current exe parent");
+    let config_path = exe_dir.join("collector.rudano");
+
+    let config_str = std::fs::read_to_string(&config_path)
+                             .expect(&format!("Read the config file from `{:?}'", &config_path));
+    let config = rudano::from_str(&config_str).expect("Config file to parse");
+    config
 }
 
 struct CollectorService {

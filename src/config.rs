@@ -1,19 +1,30 @@
 use crate::OkErr;
+use serde::{Serialize, Deserialize};
 
-pub struct ShellCheckConfig {
-    pub name: String,
-    pub cmd: String,
-    pub interval: chrono::Duration,
+#[derive(Serialize, Deserialize)]
+pub struct Collector {
+    pub shell_checks: Vec<ShellCheck>,
+    pub shell_metrics: Vec<ShellMetric>,
 }
 
-pub struct ShellMetricConfig {
+// TODO: Delete `Config` suffix?
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ShellCheck {
     pub name: String,
     pub cmd: String,
-    pub interval: chrono::Duration,
+    pub interval: Duration,
+}
+
+// TODO: Delete `Config` suffix?
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ShellMetric {
+    pub name: String,
+    pub cmd: String,
+    pub interval: Duration,
     pub check: MetricCheck,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum MetricCheck {
     None,
     Min(i64),
@@ -29,6 +40,21 @@ impl MetricCheck {
             MetricCheck::Max(max) if value <= *max => OkErr::Ok,
             MetricCheck::Max(max) if value >  *max => OkErr::Err,
             _ => panic!("Not reached"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Duration {
+    Seconds(u32),
+    Minutes(u32),
+}
+
+impl Duration {
+    pub fn as_chrono_duration(&self) -> chrono::Duration {
+        match self {
+            Duration::Seconds(x) => chrono::Duration::seconds(*x as i64),
+            Duration::Minutes(x) => chrono::Duration::minutes(*x as i64),
         }
     }
 }

@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-mod config;
+pub mod config;
 mod log_store;
 mod metric_store;
 mod notifier;
@@ -13,7 +13,7 @@ pub mod collector {
 }
 
 pub use crate::{
-    config::{MetricCheck, ShellCheckConfig, ShellMetricConfig},
+    config::MetricCheck,
     log_store::{Log, LogStore},
     metric_store::MetricStore,
     notifier::Notifier,
@@ -156,7 +156,7 @@ impl MetricValue {
 }
 
 pub fn create_shell_checks(
-    check_configs: &[ShellCheckConfig],
+    check_configs: &[config::ShellCheck],
     ls: &Arc<Mutex<LogStore>>,
     ms: &Arc<Mutex<MetricStore>>,
     sched: &Arc<Mutex<Scheduler>>)
@@ -170,7 +170,7 @@ pub fn create_shell_checks(
 }
 
 pub fn create_shell_metrics(
-    metric_configs: &[ShellMetricConfig],
+    metric_configs: &[config::ShellMetric],
     ls: &Arc<Mutex<LogStore>>,
     ms: &Arc<Mutex<MetricStore>>,
     n: &Arc<Mutex<Notifier>>,
@@ -187,7 +187,7 @@ pub fn create_shell_metrics(
 
 // TODO: Ugly duplication between this and add_shell_metric_job.
 pub fn add_shell_check_job(
-    config: &ShellCheckConfig,
+    config: &config::ShellCheck,
     ls: Arc<Mutex<LogStore>>,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
@@ -195,7 +195,7 @@ pub fn add_shell_check_job(
     let cmd = config.cmd.to_owned();
     let name = config.name.to_owned();
     let j = scheduler::JobDefinition {
-        interval: config.interval,
+        interval: config.interval.as_chrono_duration(),
         name: String::from(&name),
         f: Arc::new(Mutex::new(move |_rc| {
             let mut command = std::process::Command::new("sh");
@@ -250,7 +250,7 @@ pub fn add_shell_check_job(
 
 // TODO: Ugly duplication between this and add_shell_check_job.
 pub fn add_shell_metric_job(
-    config: &ShellMetricConfig,
+    config: &config::ShellMetric,
     ls: Arc<Mutex<LogStore>>,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
@@ -258,7 +258,7 @@ pub fn add_shell_metric_job(
     let cmd = config.cmd.to_owned();
     let name = config.name.to_owned();
     let j = scheduler::JobDefinition {
-        interval: config.interval,
+        interval: config.interval.as_chrono_duration(),
         name: String::from(&name),
         f: Arc::new(Mutex::new(move |_rc| {
             let mut command = std::process::Command::new("sh");
@@ -313,7 +313,7 @@ pub fn add_shell_metric_job(
 }
 
 pub fn connect_metric_to_notifier(
-    smc: &ShellMetricConfig,
+    smc: &config::ShellMetric,
     ms: &Arc<Mutex<MetricStore>>,
     n: &Arc<Mutex<Notifier>>
 ) {

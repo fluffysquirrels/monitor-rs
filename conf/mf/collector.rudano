@@ -1,0 +1,8 @@
+Collector {
+    shell_checks: [ShellCheck {
+        name: "zfs.mf.healthy",
+        cmd: "/sbin/zpool status -x | grep \'all pools are healthy\'",
+        interval: Seconds(5),
+    }],
+    shell_metrics: [],
+}

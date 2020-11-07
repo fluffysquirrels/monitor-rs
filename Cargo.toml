@@ -17,6 +17,8 @@ notify-rust = "4"
 process_control = "2.0.2"
 prost = "0.6.1"
 rt-graph = "0.3.3"
+rudano = "0.1.0"
+serde = { version = "1.0.117", features = ["derive"] }
 tokio = { version = "0.2", features = ["full"] }
 tonic = { version = "0.3.1", features = ["tls"] }
 
