@@ -1,0 +1,29 @@
+Collector {
+    shell_checks: [
+        ShellCheck {
+            name: "travis.github.fluffysquirrels/mqtt-async-client-rs.master.passed",
+            cmd: "curl -f -s -H \'Travis-API-Version: 3\' \'https://api.travis-ci.com/repo/github/fluffysquirrels%2Fmqtt-async-client-rs/branch/master\' | tee /dev/stderr | jq \'.last_build.state\' | egrep \'^\"passed\"$\'",
+            interval: Minutes(30),
+        },
+        ShellCheck {
+            name: "travis.github.fluffysquirrels/webdriver_client_rust.master.passed",
+            cmd: "curl -f -s -H \'Travis-API-Version: 3\' \'https://api.travis-ci.com/repo/github/fluffysquirrels%2Fwebdriver_client_rust/branch/master\' | tee /dev/stderr | jq \'.last_build.state\' | egrep \'^\"passed\"$\'",
+            interval: Minutes(30),
+        },
+        ShellCheck {
+            name: "travis.github.fluffysquirrels/framed-rs.master.passed",
+            cmd: "curl -f -s -H \'Travis-API-Version: 3\' \'https://api.travis-ci.com/repo/github/fluffysquirrels%2Fframed-rs/branch/master\' | tee /dev/stderr | jq \'.last_build.state\' | egrep \'^\"passed\"$\'",
+            interval: Minutes(30),
+        },
+    ],
+    shell_metrics: [],
+
+    server_tls_identity: Some(TlsIdentity {
+        cert_path: "/usr/local/lib/monitor/cert/f1.fullchain",
+        key_path:  "/usr/local/lib/monitor/cert/f1.key",
+    }),
+
+    client_tls_ca_cert: Some(TlsCertificate {
+        cert_path: "/usr/local/lib/monitor/cert/ca.cert",
+    }),
+}

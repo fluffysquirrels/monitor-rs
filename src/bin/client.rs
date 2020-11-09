@@ -50,6 +50,11 @@ fn shell_check_configs() -> Vec<ShellCheck> {
             interval: config::Duration::Seconds(5),
         },
         ShellCheck {
+            name: "ping.f1".to_owned(),
+            cmd: "ping -c 1 -W 5 f1".to_owned(),
+            interval: config::Duration::Seconds(60),
+        },
+        ShellCheck {
             name: "apt.plato.upgradable".to_owned(),
             cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
             interval: config::Duration::Minutes(10),
@@ -69,9 +74,9 @@ fn shell_check_configs() -> Vec<ShellCheck> {
             cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
             interval: config::Duration::Minutes(2),
         },
-        check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
-        check_travis("github", "fluffysquirrels/webdriver_client_rust", "master"),
-        check_travis("github", "fluffysquirrels/framed-rs", "master"),
+        // check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
+        // check_travis("github", "fluffysquirrels/webdriver_client_rust", "master"),
+        // check_travis("github", "fluffysquirrels/framed-rs", "master"),
     ]
 }
 
@@ -121,14 +126,44 @@ fn config() -> config::Client {
             config::RemoteSync {
                 url: "https://mf:8080".to_owned(),
                 server_ca: config::TlsCertificate {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/rsa/ca.cert".to_owned(),
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
                 },
                 client_identity: config::TlsIdentity {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/rsa/client.fullchain".to_owned(),
-                    key_path:  "/home/alex/Code/rust/monitor/cert/rsa/client.key".to_owned(),
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
+                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
+                },
+            },
+            config::RemoteSync {
+                url: "https://f1:80".to_owned(),
+                server_ca: config::TlsCertificate {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
+                },
+                client_identity: config::TlsIdentity {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
+                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
                 },
             },
         ],
+        remote_checks: vec![
+            config::RemoteCheck {
+                name: "travis.github.fluffysquirrels/framed-rs.master.passed".to_owned(),
+                host_name: "instance-1".to_owned(),
+            },
+            config::RemoteCheck {
+                name: "travis.github.fluffysquirrels/mqtt-async-client-rs.master.passed"
+                          .to_owned(),
+                host_name: "instance-1".to_owned(),
+            },
+            config::RemoteCheck {
+                name: "travis.github.fluffysquirrels/webdriver_client_rust.master.passed"
+                          .to_owned(),
+                host_name: "instance-1".to_owned(),
+            },
+            config::RemoteCheck {
+                name: "zfs.mf.healthy".to_owned(),
+                host_name: "MicroFridge".to_owned(),
+            },
+        ]
     }
 }
 
@@ -144,6 +179,8 @@ fn main() {
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
     let config = config();
+    trace!("client config in rudano = {}",
+           rudano::to_string_pretty(&config).expect("rudano serialisation"));
 
     create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
     create_shell_metrics(&config.shell_metrics, &ls, &ms, &n, &sched);
@@ -210,28 +247,22 @@ fn build_ui(
 
     for config in config.shell_checks.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
         metrics.insert(key, metric_ui);
     }
 
     for config in config.shell_metrics.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
         metrics.insert(key, metric_ui);
     }
 
-    // for config in remote_configs {
-    {
-        let key = MetricKey {
-            name: "zfs.mf.healthy".to_owned(),
-            host: Host::Remote(RemoteHost {
-                name: "MicroFridge".to_owned()
-            })
-        };
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
+    for config in config.remote_checks.iter() {
+        let key = config.to_metric_key();
+        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
         metrics.insert(key, metric_ui);
     }
-    // }
+
     window.show_all();
     for mui in metrics.values() {
         mui.graph.hide();

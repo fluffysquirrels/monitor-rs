@@ -20,6 +20,6 @@ basicConstraints = CA:true
 keyUsage = cRLSign, keyCertSign, digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment, keyAgreement, keyCertSign, cRLSign
 
 [ alt_names ]
-DNS.1 = mf
+DNS.1 = f1
 DNS.2 = second.testserver.com
 DNS.3 = localhost

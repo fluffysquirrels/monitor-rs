@@ -1,4 +1,4 @@
-use crate::OkErr;
+use crate::{Host, MetricKey, OkErr, RemoteHost};
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
@@ -14,6 +14,7 @@ pub struct Client {
     pub shell_checks: Vec<ShellCheck>,
     pub shell_metrics: Vec<ShellMetric>,
     pub remote_syncs: Vec<RemoteSync>,
+    pub remote_checks: Vec<RemoteCheck>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -97,4 +98,21 @@ pub struct RemoteSync {
     pub url: String,
     pub server_ca: TlsCertificate,
     pub client_identity: TlsIdentity,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RemoteCheck {
+    pub name: String,
+    pub host_name: String,
+}
+
+impl RemoteCheck {
+    pub fn to_metric_key(&self) -> MetricKey {
+        MetricKey {
+            name: self.name.clone(),
+            host: Host::Remote(RemoteHost {
+                name: self.host_name.clone(),
+            }),
+        }
+    }
 }

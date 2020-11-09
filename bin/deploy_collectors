@@ -6,9 +6,12 @@ readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
 
 cd "${package_dir}";
 cargo build --release --bin collector;
-ssh mf "sudo /bin/systemctl stop monitor-collector.service"
-scp target/release/collector mf:/usr/local/lib/monitor/;
-scp conf/mf/collector.rudano mf:/usr/local/lib/monitor/;
-ssh mf "sudo /bin/systemctl start monitor-collector.service &&
-        sleep 1 &&
-        /bin/systemctl status monitor-collector.service";
+
+for server in mf f1 ; do
+    ssh ${server} "sudo /bin/systemctl stop monitor-collector.service"
+    scp target/release/collector ${server}:/usr/local/lib/monitor/;
+    scp conf/${server}/collector.rudano ${server}:/usr/local/lib/monitor/;
+    ssh ${server} "sudo /bin/systemctl start monitor-collector.service &&
+                   sleep 1 &&
+                   /bin/systemctl status monitor-collector.service";
+done

@@ -113,7 +113,7 @@ pub fn spawn_job_streaming(config: &config::RemoteSync, ms: &Arc<Mutex<MetricSto
                                         }
                                         Ok(m) => m,
                                     };
-                                debug!("remote-sync got a metric key=`{}'",
+                                trace!("remote-sync got a metric key=`{}'",
                                        metric.key().display_name());
                                 if let Some(latest) = metric.latest() {
                                     ms.lock().unwrap()
