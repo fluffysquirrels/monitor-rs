@@ -19,8 +19,6 @@
         - Needs mutual TLS
     - Force remote checks and metrics
     - Retrieve remote logs
-    - Cache connection and re-use between invocations.
-    - Mutual TLS
     - What happens when the collector or client is overloaded? How would we shed load?
 * Show i64 metric checks in green for Ok or red for Err.
 * View old logs
@@ -42,6 +40,8 @@
 
 ## Improvements
 
+* Consider separate Cargo.tomls for client and collector, so collector can build
+  without gtk.
 * `metric_store::Metric::as_protobuf` sets hostname while encoding: this
   should probably not be hidden in here.
 * More of a visual separator in the GUI between metrics to help show
@@ -106,10 +106,12 @@ sleep 1
 sudo systemctl status monitor-collector.service
 ```
 
-Put this in sudoers, replacing $(hostname)
+Put this in sudoers, replacing `$(hostname)`
 ```
 # Allow alex to run, stop, or restart the monitor-collector service
 alex $(hostname)=(root) NOPASSWD: /bin/systemctl restart monitor-collector.service, /bin/systemctl stop monitor-collector.service, /bin/systemctl start monitor-collector.service
 ```
+
+Copy the cert and key to the server, set key permissions to read only by monitor-collector.
 
 Now use `${REPO}/bin/deploy_collectors`
