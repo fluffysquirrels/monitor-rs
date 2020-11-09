@@ -1,5 +1,7 @@
 # Certificates
 
+## Use the script `build-a-pki.sh` from rustls
+
 ## Instructions
 
 ### Generate a self-signed CA key and cert for the server
