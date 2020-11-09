@@ -39,3 +39,9 @@ impl LogStore {
         &mut self.update_signal
     }
 }
+
+impl Default for LogStore {
+    fn default() -> LogStore {
+        LogStore::new()
+    }
+}

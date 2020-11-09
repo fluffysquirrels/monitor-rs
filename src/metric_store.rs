@@ -51,7 +51,7 @@ impl MetricStore {
         trace!("update key=`{}', point={:?}", key.display_name(), point);
         let mut metric_state =
             self.metrics.entry(key.clone())
-                .or_insert(MetricState::with_key(key));
+                .or_insert_with(|| MetricState::with_key(key));
         let old_value = metric_state.latest.clone();
         metric_state.latest = Some(point);
         if old_value != metric_state.latest {
@@ -86,7 +86,13 @@ impl MetricStore {
 
     fn get_or_insert_metric(&mut self, key: &MetricKey) -> &mut MetricState {
         self.metrics.entry(key.clone())
-                    .or_insert(MetricState::with_key(key))
+                    .or_insert_with(|| MetricState::with_key(key))
+    }
+}
+
+impl Default for MetricStore {
+    fn default() -> MetricStore {
+        MetricStore::new()
     }
 }
 
@@ -115,9 +121,10 @@ impl Metric {
                 Some(dp) => Some(DataPoint {
                     time: chrono_datetime_from_protobuf(
                               dp.time.as_ref()
-                                     .ok_or("protobuf DataPoint missing .time".to_owned())?)?,
+                                     .ok_or_else(|| "protobuf DataPoint missing .time"
+                                                    .to_owned())?)?,
                     val: match dp.value.as_ref()
-                                 .ok_or("protobuf DataPoint missing .value".to_owned())? {
+                                 .ok_or_else(|| "protobuf DataPoint missing .value".to_owned())? {
                         collector::data_point::Value::Ok(true) => MetricValue::OkErr(OkErr::Ok),
                         collector::data_point::Value::Ok(false) => MetricValue::OkErr(OkErr::Err),
                         collector::data_point::Value::I64(x) => MetricValue::I64(*x),
@@ -129,7 +136,7 @@ impl Metric {
                 name: metric.name.clone(),
                 host: Host::Remote(RemoteHost {
                     name: metric.from_host.as_ref()
-                                .ok_or("protobuf Metric missing .from_host".to_owned())?
+                                .ok_or_else(|| "protobuf Metric missing .from_host".to_owned())?
                                 .name.clone(),
                 })
             },

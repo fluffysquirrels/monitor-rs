@@ -50,10 +50,8 @@ impl Scheduler {
                 force_run: false,
             });
         if let Some(t) = self.job_thread.as_ref() {
-            match t.tx.send(ThreadMessage::ForceRun) {
-                Err(_) =>
-                    error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped"),
-                Ok(_) => (),
+            if t.tx.send(ThreadMessage::ForceRun).is_err() {
+                error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped");
             }
         };
     }
@@ -65,10 +63,8 @@ impl Scheduler {
                     .expect("To find the job");
         j.force_run = true;
         if let Some(t) = self.job_thread.as_ref() {
-            match t.tx.send(ThreadMessage::ForceRun) {
-                Err(_) =>
-                    error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped"),
-                Ok(_) => (),
+            if t.tx.send(ThreadMessage::ForceRun).is_err() {
+                error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped");
             }
         };
     }
@@ -90,14 +86,11 @@ impl Scheduler {
     pub fn join(&mut self) {
         assert!(self.job_thread.is_some());
         let t = self.job_thread.take().unwrap();
-        match t.tx.send(ThreadMessage::Shutdown) {
-            Err(_) =>
-                error!("Error sending scheduler::ThreadMessage::Shutdown, remote end is dropped"),
-            Ok(_) => (),
+        if t.tx.send(ThreadMessage::Shutdown).is_err() {
+            error!("Error sending scheduler::ThreadMessage::Shutdown, remote end is dropped");
         };
-        match t.handle.join() {
-            Err(e) => error!("Error joining scheduler thread: {:?}", e),
-            Ok(_) => (),
+        if let Err(e) = t.handle.join() {
+            error!("Error joining scheduler thread: {:?}", e);
         };
     }
 
@@ -188,6 +181,12 @@ impl Scheduler {
             wait_duration,
             flow_control,
         }
+    }
+}
+
+impl Default for Scheduler {
+    fn default() -> Scheduler {
+        Scheduler::new()
     }
 }
 

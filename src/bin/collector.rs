@@ -7,12 +7,8 @@ use monitor::{
     Continue,
     create_shell_checks,
     // create_shell_metrics,
-    DataPoint,
     LogStore,
-    MetricCheck,
     MetricStore,
-    MetricValue,
-    OkErr,
     scheduler::Scheduler,
 };
 use std::sync::{Arc, Mutex};
@@ -20,7 +16,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::main]
 async fn main() {
     env_logger::Builder::new()
-        .parse_filters(&std::env::var("RUST_LOG").unwrap_or("info".to_owned()))
+        .parse_filters(&std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
         .format_timestamp_micros()
         .init();
 
@@ -66,9 +62,9 @@ fn load_config() -> config::Collector {
     let config_path = exe_dir.join("collector.rudano");
 
     let config_str = std::fs::read_to_string(&config_path)
-                             .expect(&format!("Read the config file from `{:?}'", &config_path));
-    let config = rudano::from_str(&config_str).expect("Config file to parse");
-    config
+        .unwrap_or_else(|e| panic!("Error reading the config file from `{:?}': {}",
+                                  &config_path, e));
+    rudano::from_str(&config_str).expect("Config file to parse")
 }
 
 fn tls_config(config: &config::Collector
@@ -110,7 +106,7 @@ impl collector_server::Collector for CollectorService {
         let metrics = metrics.unwrap();
         trace!("num_metrics = {}", metrics.len());
         Ok(tonic::Response::new(collector::MetricsReply {
-            metrics: metrics,
+            metrics,
         }))
     }
 

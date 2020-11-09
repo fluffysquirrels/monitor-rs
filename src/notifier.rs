@@ -55,3 +55,9 @@ impl Notifier {
         }
     }
 }
+
+impl Default for Notifier {
+    fn default() -> Notifier {
+        Notifier::new()
+    }
+}

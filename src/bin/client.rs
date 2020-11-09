@@ -21,9 +21,7 @@ use monitor::{
     scheduler::Scheduler,
 };
 use gio::prelude::*;
-use glib;
 use gtk::prelude::*;
-use rt_graph;
 use std::{
     cell::Cell,
     collections::BTreeMap,
@@ -136,7 +134,7 @@ fn config() -> config::Client {
 
 fn main() {
     env_logger::Builder::new()
-        .parse_filters(&std::env::var("RUST_LOG").unwrap_or("info".to_owned()))
+        .parse_filters(&std::env::var("RUST_LOG").unwrap_or_else(|_| "info".to_owned()))
         .format_timestamp_micros()
         .init();
 
@@ -163,14 +161,10 @@ fn main() {
                               gio::ApplicationFlags::default())
             .expect("Application::new failed");
 
-    let msc = ms.clone();
-    let sc = sched.clone();
-    let lsc = ls.clone();
-    let config = config.clone();
     application.connect_activate(move |app| {
-        let ms = msc.clone();
-        let sc = sc.clone();
-        let ls = lsc.clone();
+        let ms = ms.clone();
+        let sc = sched.clone();
+        let ls = ls.clone();
         let config = config.clone();
         build_ui(&config, app, ms, sc, ls);
     });
@@ -195,7 +189,7 @@ fn build_ui(
     // Load icon relative to Cargo provided package root or if that's
     // unavailable, the current directory.
     let mut icon_path = std::env::var("CARGO_MANIFEST_DIR")
-        .unwrap_or(".".to_string());
+        .unwrap_or_else(|_| ".".to_string());
     icon_path.push_str("/third_party/gnome-icon-theme/utilities-system-monitor.png");
     match window.set_icon_from_file(icon_path) {
         Ok(()) => (),
@@ -256,9 +250,8 @@ fn build_ui(
         let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
 
         ls.lock().unwrap().update_signal().connect(move |log| {
-            match tx.send(log) {
-                Err(_) => error!("LogStore UI channel send error"),
-                Ok(_) => (),
+            if tx.send(log).is_err() {
+                error!("LogStore UI channel send error");
             }
             Continue::Continue
         });
@@ -280,17 +273,15 @@ fn build_ui(
         let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
 
         ms.lock().unwrap().update_signal_for_all().connect(move |metric| {
-            match tx.send(metric) {
-                Err(_) => error!("MetricStore UI channel send error"),
-                Ok(_) => (),
+            if tx.send(metric).is_err() {
+                error!("MetricStore UI channel send error");
             }
             Continue::Continue
         });
 
-        let uic = ui.clone();
         rx.attach(Some(&ui_thread), move |metric| {
             if let Some(DataPoint { val, .. }) = metric.latest() {
-                let ui_metric = uic.metrics.get(metric.key());
+                let ui_metric = ui.metrics.get(metric.key());
                 if let Some(ui_metric) = ui_metric {
                     if let MetricValue::OkErr(ok) = val {
                         ui_metric.label_status.set_markup(match ok {

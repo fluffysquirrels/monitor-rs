@@ -79,6 +79,12 @@ impl<T: Clone> Signal<T> {
     }
 }
 
+impl<T: Clone> Default for Signal<T> {
+    fn default() -> Signal<T> {
+        Signal::new()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{Continue, Signal};

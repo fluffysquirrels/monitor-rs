@@ -121,7 +121,7 @@ pub fn run_shell(mut cmd: std::process::Command) -> Result<RunShellResult, std::
                           finish_utc.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)));
 
     let res = RunShellResult {
-        log: log,
+        log,
         exit_code: res.status.code(),
         ok: match res.status.success() {
             false => OkErr::Err,
@@ -224,7 +224,7 @@ pub fn add_shell_check_job(
                         finish: res.finish_time,
                         duration: res.duration,
                         log: res.log,
-                        key: key.clone(),
+                        key,
                     });
                 },
                 Err(e) => {
@@ -239,7 +239,7 @@ pub fn add_shell_check_job(
                         duration: std::time::Duration::from_millis(
                             (finish - start).num_milliseconds() as u64),
                         log: format!("Error={}", e),
-                        key: key.clone(),
+                        key,
                     });
                 }
             }
@@ -292,7 +292,7 @@ pub fn add_shell_metric_job(
                         finish: res.finish_time,
                         duration: res.duration,
                         log: res.log,
-                        key: key.clone(),
+                        key,
                     });
                 },
                 Err(e) => {
@@ -303,7 +303,7 @@ pub fn add_shell_metric_job(
                         duration: std::time::Duration::from_millis(
                             (finish - start).num_milliseconds() as u64),
                         log: format!("Error={}", e),
-                        key: key.clone(),
+                        key,
                     });
                 }
             }
