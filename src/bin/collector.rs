@@ -24,13 +24,13 @@ async fn main() {
         .format_timestamp_micros()
         .init();
 
+    let config = load_config();
+    trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
+
     let ls = Arc::new(Mutex::new(LogStore::new()));
     let ms = Arc::new(Mutex::new(MetricStore::new()));
     // let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
-
-    let config = load_config();
-    trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
 
     create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
 
@@ -42,11 +42,20 @@ async fn main() {
     let collector_service = CollectorService {
         metric_store: ms.clone(),
     };
-    info!("Listening on http://{}", addr);
-    tonic::transport::Server::builder()
-        .add_service(collector::collector_server::CollectorServer::new(collector_service))
-        .serve(addr)
-        .await.unwrap();
+    let tls_config = tls_config(&config).expect("Ok TLS config");
+    info!("Listening on {}://{}",
+          match tls_config {
+              Some(_) => "https",
+              None => "http",
+          }, addr);
+    let sb = tonic::transport::Server::builder();
+    let mut sb = match tls_config {
+        Some(tls) => sb.tls_config(tls).expect("tls config OK"),
+        None => sb,
+    };
+    sb.add_service(collector::collector_server::CollectorServer::new(collector_service))
+      .serve(addr)
+      .await.unwrap();
 }
 
 fn load_config() -> config::Collector {
@@ -60,6 +69,22 @@ fn load_config() -> config::Collector {
                              .expect(&format!("Read the config file from `{:?}'", &config_path));
     let config = rudano::from_str(&config_str).expect("Config file to parse");
     config
+}
+
+fn tls_config(config: &config::Collector
+) -> Result<Option<tonic::transport::ServerTlsConfig>, Box<dyn std::error::Error>> {
+    let identity_config = match config.server_tls_identity.as_ref() {
+        None => return Ok(None),
+        Some(idc) => idc,
+    };
+    let identity = identity_config.load().expect("Load server TLS identity");
+    let tls_config = tonic::transport::ServerTlsConfig::new()
+        .identity(identity);
+    let tls_config = match config.client_tls_ca_cert.as_ref() {
+        Some(client_ca_cert) => tls_config.client_ca_root(client_ca_cert.load()?),
+        None => tls_config,
+    };
+    Ok(Some(tls_config))
 }
 
 struct CollectorService {

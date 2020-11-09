@@ -1,8 +1,20 @@
 Collector {
-    shell_checks: [ShellCheck {
-        name: "zfs.mf.healthy",
-        cmd: "/sbin/zpool status -x | grep \'all pools are healthy\'",
-        interval: Seconds(5),
-    }],
+    shell_checks: [
+        ShellCheck {
+            name: "zfs.mf.healthy",
+            cmd: "/sbin/zpool status -x | grep \'all pools are healthy\'",
+            interval: Seconds(5),
+        }
+    ],
     shell_metrics: [],
+
+    // server_tls_identity: None,
+    server_tls_identity: Some(TlsIdentity {
+        cert_path: "/usr/local/lib/monitor/end.fullchain",
+        key_path:  "/usr/local/lib/monitor/end.key",
+    }),
+
+    client_tls_ca_cert: Some(TlsCertificate {
+        cert_path: "/usr/local/lib/monitor/ca.cert",
+    }),
 }

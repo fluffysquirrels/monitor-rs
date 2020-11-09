@@ -2,8 +2,8 @@
 extern crate log;
 
 use monitor::{
-    add_remote_sync_job_polling,
     connect_all_checks_to_notifier,
+    config::{self, ShellCheck, ShellMetric},
     Continue,
     create_shell_checks,
     create_shell_metrics,
@@ -17,11 +17,8 @@ use monitor::{
     Notifier,
     OkErr,
     RemoteHost,
-    RemoteSyncConfig,
+    remote_sync,
     scheduler::Scheduler,
-    ShellCheckConfig,
-    ShellMetricConfig,
-    spawn_remote_sync_job_streaming,
 };
 use gio::prelude::*;
 use glib;
@@ -47,32 +44,32 @@ struct MetricUi {
     show_graph_btn: gtk::Button,
 }
 
-fn shell_check_configs() -> Vec<ShellCheckConfig> {
+fn shell_check_configs() -> Vec<ShellCheck> {
     vec![
-        ShellCheckConfig {
+        ShellCheck {
             name: "ping.mf".to_owned(),
             cmd: "ping -c 1 -W 5 mf".to_owned(),
-            interval: chrono::Duration::seconds(5),
+            interval: config::Duration::Seconds(5),
         },
-        ShellCheckConfig {
+        ShellCheck {
             name: "apt.plato.upgradable".to_owned(),
             cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
-            interval: chrono::Duration::minutes(10),
+            interval: config::Duration::Minutes(10),
         },
-        ShellCheckConfig {
+        ShellCheck {
             name: "apt.mf.upgradable".to_owned(),
             cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
-            interval: chrono::Duration::minutes(10),
+            interval: config::Duration::Minutes(10),
         },
-        ShellCheckConfig {
+        ShellCheck {
             name: "internet.up.gstatic".to_owned(),
             cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
-            interval: chrono::Duration::minutes(2),
+            interval: config::Duration::Minutes(2),
         },
-        ShellCheckConfig {
+        ShellCheck {
             name: "zfs.mf.healthy".to_owned(),
             cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
-            interval: chrono::Duration::minutes(2),
+            interval: config::Duration::Minutes(2),
         },
         check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
         check_travis("github", "fluffysquirrels/webdriver_client_rust", "master"),
@@ -80,31 +77,31 @@ fn shell_check_configs() -> Vec<ShellCheckConfig> {
     ]
 }
 
-fn shell_metric_configs() -> Vec<ShellMetricConfig> {
+fn shell_metric_configs() -> Vec<ShellMetric> {
     vec![
-        ShellMetricConfig {
+        ShellMetric {
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
             name: "df.local.root".to_owned(),
-            interval: chrono::Duration::minutes(5),
+            interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
-        ShellMetricConfig {
+        ShellMetric {
             cmd: "ssh mf df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
             name: "df.mf.root".to_owned(),
-            interval: chrono::Duration::minutes(5),
+            interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
-        ShellMetricConfig {
+        ShellMetric {
             cmd: "ssh mf df -h /mnt/monster | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
             name: "df.mf.monster".to_owned(),
-            interval: chrono::Duration::minutes(5),
+            interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
     ]
 }
 
-fn check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheckConfig {
-    ShellCheckConfig {
+fn check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheck {
+    ShellCheck {
         name: format!("travis.{}.{}.{}.passed", provider, repo, branch),
         cmd: format!(
 "curl -f -s -H 'Travis-API-Version: 3' 'https://api.travis-ci.com/repo/{}/{}/branch/{}' |
@@ -114,7 +111,26 @@ egrep '^\"passed\"$'",
             provider,
             repo.replace('/', "%2F"),
             branch),
-        interval: chrono::Duration::minutes(30),
+        interval: config::Duration::Minutes(30),
+    }
+}
+
+fn config() -> config::Client {
+    config::Client {
+        shell_checks: shell_check_configs(),
+        shell_metrics: shell_metric_configs(),
+        remote_syncs: vec![
+            config::RemoteSync {
+                url: "https://mf:8080".to_owned(),
+                server_ca: config::TlsCertificate {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/rsa/ca.cert".to_owned(),
+                },
+                client_identity: config::TlsIdentity {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/rsa/client.fullchain".to_owned(),
+                    key_path:  "/home/alex/Code/rust/monitor/cert/rsa/client.key".to_owned(),
+                },
+            },
+        ],
     }
 }
 
@@ -129,19 +145,16 @@ fn main() {
     let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
-    let check_configs = shell_check_configs();
-    create_shell_checks(&check_configs, &ls, &ms, &sched);
+    let config = config();
 
-    let metric_configs = shell_metric_configs();
-    create_shell_metrics(&metric_configs, &ls, &ms, &n, &sched);
+    create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
+    create_shell_metrics(&config.shell_metrics, &ls, &ms, &n, &sched);
 
     connect_all_checks_to_notifier(&ms, &n);
 
-    let sync_config = RemoteSyncConfig {
-        url: "http://mf:8080".to_owned(),
-    };
-    //add_remote_sync_job_polling(&sync_config, &ms, &sched);
-    spawn_remote_sync_job_streaming(&sync_config, &ms);
+    for rsc in config.remote_syncs.iter() {
+        remote_sync::spawn_job_streaming(&rsc, &ms);
+    }
 
     sched.lock().unwrap().spawn();
 
@@ -153,19 +166,20 @@ fn main() {
     let msc = ms.clone();
     let sc = sched.clone();
     let lsc = ls.clone();
+    let config = config.clone();
     application.connect_activate(move |app| {
         let ms = msc.clone();
         let sc = sc.clone();
         let ls = lsc.clone();
-        build_ui(&check_configs, &metric_configs, app, ms, sc, ls);
+        let config = config.clone();
+        build_ui(&config, app, ms, sc, ls);
     });
 
     application.run(&std::env::args().collect::<Vec<_>>());
 }
 
 fn build_ui(
-    check_configs: &[ShellCheckConfig],
-    metric_configs: &[ShellMetricConfig],
+    config: &config::Client,
     application: &gtk::Application,
     ms: Arc<Mutex<MetricStore>>,
     sched: Arc<Mutex<Scheduler>>,
@@ -200,13 +214,13 @@ fn build_ui(
 
     let mut metrics = BTreeMap::<MetricKey, MetricUi>::new();
 
-    for config in check_configs.iter() {
+    for config in config.shell_checks.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
         let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
         metrics.insert(key, metric_ui);
     }
 
-    for config in metric_configs.iter() {
+    for config in config.shell_metrics.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
         let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key,  &ls, &ms, &sched);
         metrics.insert(key, metric_ui);
