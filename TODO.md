@@ -9,17 +9,17 @@
 ## Features
 
 * Remote check syncing over gRPC
+    - Remote sync error logs should show which sync job they belong to
     - Show status of syncing in checks
     - Migrate more mf jobs to collector
     - Notify on all synced metrics.
+        - Including I64 metrics.
     - Show synced metrics in UI.
         - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
-    - Run collector on f1
-        - Pre-requisite: read checks from config file
-        - Needs mutual TLS
     - Force remote checks and metrics
-    - Retrieve remote logs
     - What happens when the collector or client is overloaded? How would we shed load?
+        - Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
+          and `try_send` will fail. Could test this by not reading from the client side.
 * Show i64 metric checks in green for Ok or red for Err.
 * View old logs
 * Push checks (e.g. webhooks for Travis)
@@ -40,6 +40,8 @@
 
 ## Improvements
 
+* Use one HTTP/2 connection per remote-sync (share between metrics and logs).
+* Fix up port numbers.
 * Consider separate Cargo.tomls for client and collector, so collector can build
   without gtk.
 * `metric_store::Metric::as_protobuf` sets hostname while encoding: this
