@@ -5,24 +5,24 @@ package collector;
 service Collector {
   rpc GetMetrics (GetMetricsRequest) returns (MetricsReply) {}
   rpc StreamMetrics (StreamMetricsRequest) returns (stream Metric) {}
+  rpc StreamLogs (StreamLogsRequest) returns (stream Log) {}
 }
 
 message GetMetricsRequest {}
 
 message StreamMetricsRequest {}
 
+message StreamLogsRequest {}
+
 message MetricsReply {
   repeated Metric metrics = 1;
 }
 
 message Metric {
-  string name = 1;
-  Host from_host = 2;
-  DataPoint latest = 3;
-}
+  reserved 1, 2;
 
-message Host {
-  string name = 1;
+  MetricKey key = 4;
+  DataPoint latest = 3;
 }
 
 message DataPoint {
@@ -34,7 +34,29 @@ message DataPoint {
   }
 }
 
+message Log {
+  Time start = 1;
+  Time finish = 2;
+  Duration duration = 3;
+  string log = 4;
+  MetricKey key = 5;
+}
+
+message MetricKey {
+  string name = 1;
+  Host from_host = 2;
+}
+
+message Host {
+  string name = 1;
+}
+
 message Time {
   sfixed64 epoch_millis = 1;
+  fixed32 nanos = 2;
+}
+
+message Duration {
+  fixed64 secs = 1;
   fixed32 nanos = 2;
 }

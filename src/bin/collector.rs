@@ -36,6 +36,7 @@ async fn main() {
 
     let addr: std::net::SocketAddr = "0.0.0.0:8080".parse().unwrap();
     let collector_service = CollectorService {
+        log_store: ls.clone(),
         metric_store: ms.clone(),
     };
     let tls_config = tls_config(&config).expect("Ok TLS config");
@@ -84,6 +85,7 @@ fn tls_config(config: &config::Collector
 }
 
 struct CollectorService {
+    log_store: Arc<Mutex<LogStore>>,
     metric_store: Arc<Mutex<MetricStore>>,
 }
 
@@ -94,13 +96,13 @@ impl collector_server::Collector for CollectorService {
         request: tonic::Request<collector::GetMetricsRequest>,
     ) -> Result<tonic::Response<collector::MetricsReply>, tonic::Status>
     {
-        trace!("CollectorService::get_metrics");
-        trace!("request remote_addr={:?}, \n  {:#?}", request.remote_addr(), request);
+        trace!(concat!("CollectorService::get_metrics",
+                       "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
         let metrics = self.metric_store.lock().unwrap().query_all();
-        let metrics = metrics.iter().map(|m| m.as_protobuf())
+        let metrics = metrics.iter().map(|m| m.to_protobuf())
                              .collect::<Result<Vec<collector::Metric>, String>>();
         if let Err(e) = metrics {
-            error!("metrics as_protobuf error: {}", e);
+            error!("metrics to_protobuf error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
         }
         let metrics = metrics.unwrap();
@@ -117,16 +119,16 @@ impl collector_server::Collector for CollectorService {
         request: tonic::Request<collector::StreamMetricsRequest>,
     ) -> Result<tonic::Response<Self::StreamMetricsStream>, tonic::Status>
     {
-        trace!("CollectorService::stream_metrics");
-        trace!("request remote_addr={:?}, \n  {:#?}", request.remote_addr(), request);
+        trace!(concat!("CollectorService::stream_metrics\n",
+                       "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
 
         // Lock the metric store until we've sent all initial values and registered our listener
         let mut lock = self.metric_store.lock().unwrap();
         let metrics = lock.query_all()
-                          .iter().map(|m| m.as_protobuf())
+                          .iter().map(|m| m.to_protobuf())
                           .collect::<Result<Vec<collector::Metric>, String>>();
         if let Err(e) = metrics {
-            error!("metrics as_protobuf error: {}", e);
+            error!("metrics to_protobuf error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
         }
         let metrics = metrics.unwrap();
@@ -139,7 +141,7 @@ impl collector_server::Collector for CollectorService {
         // &mut method on a captured variable in an Fn closure.
         let tx = Mutex::new(tx);
         lock.update_signal_for_all().connect(move |metric| {
-            let metric_proto = match metric.as_protobuf() {
+            let metric_proto = match metric.to_protobuf() {
                 Err(e) => {
                     error!("stream_metrics: failed to encode as protobuf: {}", e);
                     return Continue::Continue;
@@ -156,6 +158,58 @@ impl collector_server::Collector for CollectorService {
                 }
                 Ok(()) =>
                     trace!("stream_metrics: sent metric key=`{}'", metric.key().display_name()),
+            };
+            Continue::Continue
+        });
+        Ok(tonic::Response::new(rx))
+    }
+
+    type StreamLogsStream =
+        tokio::sync::mpsc::Receiver<Result<collector::Log, tonic::Status>>;
+    async fn stream_logs(
+        &self,
+        request: tonic::Request<collector::StreamLogsRequest>,
+    ) -> Result<tonic::Response<Self::StreamLogsStream>, tonic::Status>
+    {
+        trace!(concat!("CollectorService::stream_logs\n",
+                       "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
+
+        // Lock the log store until we've sent all initial values and registered our listener
+        let mut lock = self.log_store.lock().unwrap();
+        let logs = lock.query_all()
+                       .map(|m| m.to_protobuf())
+                       .collect::<Result<Vec<collector::Log>, String>>();
+        if let Err(e) = logs {
+            error!("logs to_protobuf error: {}", e);
+            return Err(tonic::Status::internal("Internal error."));
+        }
+        let logs = logs.unwrap();
+        let (mut tx, rx) = tokio::sync::mpsc::channel(logs.len() + 10);
+        for l in logs.into_iter() {
+            tx.try_send(Ok(l)).expect("channel to have capacity for all initial values");
+        }
+        trace!("CollectorService::stream_logs sent initial values");
+        // Wrap in a mutex to keep the borrow checker happy that we're using a
+        // &mut method on a captured variable in an Fn closure.
+        let tx = Mutex::new(tx);
+        lock.update_signal().connect(move |log| {
+            let log_proto = match log.to_protobuf() {
+                Err(e) => {
+                    error!("stream_logs: failed to encode as protobuf: {}", e);
+                    return Continue::Continue;
+                },
+                Ok(m) => m,
+            };
+            match tx.lock().unwrap().try_send(Ok(log_proto)) {
+                Err(tokio::sync::mpsc::error::TrySendError::Full(_)) =>
+                    error!("stream_logs: channel full key={}",
+                           log.key.display_name()),
+                Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                    debug!("stream_logs: channel closed");
+                    return Continue::Disconnect;
+                }
+                Ok(()) =>
+                    trace!("stream_logs: sent log key=`{}'", log.key.display_name()),
             };
             Continue::Continue
         });

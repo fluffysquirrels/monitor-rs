@@ -16,7 +16,6 @@ use monitor::{
     MetricValue,
     Notifier,
     OkErr,
-    RemoteHost,
     remote_sync,
     scheduler::Scheduler,
 };
@@ -84,7 +83,7 @@ fn shell_metric_configs() -> Vec<ShellMetric> {
     vec![
         ShellMetric {
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
-            name: "df.local.root".to_owned(),
+            name: "df.plato.root".to_owned(),
             interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
@@ -103,7 +102,7 @@ fn shell_metric_configs() -> Vec<ShellMetric> {
     ]
 }
 
-fn check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheck {
+fn _check_travis(provider: &str, repo: &str, branch: &str) -> ShellCheck {
     ShellCheck {
         name: format!("travis.{}.{}.{}.passed", provider, repo, branch),
         cmd: format!(
@@ -188,7 +187,7 @@ fn main() {
     connect_all_checks_to_notifier(&ms, &n);
 
     for rsc in config.remote_syncs.iter() {
-        remote_sync::spawn_job_streaming(&rsc, &ms);
+        remote_sync::spawn_jobs_streaming(&rsc, &ls, &ms);
     }
 
     sched.lock().unwrap().spawn();

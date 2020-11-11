@@ -3,11 +3,9 @@ use crate::{
     chrono_datetime_to_protobuf,
     collector,
     DataPoint,
-    Host,
     MetricKey,
     MetricValue,
     OkErr,
-    RemoteHost,
     Signal,
 };
 use std::collections::BTreeMap;
@@ -56,7 +54,7 @@ impl MetricStore {
         metric_state.latest = Some(point);
         if old_value != metric_state.latest {
             trace!("raising signals for key=`{}'", key.display_name());
-            let metric = metric_state.as_metric();
+            let metric = metric_state.to_metric();
             metric_state.update_signal.raise(metric.clone());
             self.update_signal_for_all.raise(metric);
         }
@@ -75,12 +73,12 @@ impl MetricStore {
 
     pub fn query_one(&self, key: &MetricKey) -> Option<Metric> {
         self.metrics.get(key)
-                    .map(|ms| ms.as_metric())
+                    .map(|ms| ms.to_metric())
     }
 
     pub fn query_all(&self) -> Vec<Metric> {
         self.metrics.values()
-                    .map(|ms| ms.as_metric())
+                    .map(|ms| ms.to_metric())
                     .collect::<Vec<Metric>>()
     }
 
@@ -105,7 +103,7 @@ impl MetricState {
         }
     }
 
-    fn as_metric(&self) -> Metric {
+    fn to_metric(&self) -> Metric {
         Metric {
             latest: self.latest.clone(),
             key: self.key.clone(),
@@ -132,41 +130,17 @@ impl Metric {
                     },
                 }),
             },
-            key: MetricKey {
-                name: metric.name.clone(),
-                host: Host::Remote(RemoteHost {
-                    name: metric.from_host.as_ref()
-                                .ok_or_else(|| "protobuf Metric missing .from_host".to_owned())?
-                                .name.clone(),
-                })
-            },
+            key: MetricKey::from_protobuf(
+                     metric.key.as_ref()
+                           .ok_or_else(|| "protobuf Metric missing .key".to_owned())?)?,
         };
-
-        if rv.key.name == "" {
-            return Err("protobuf Metric empty .key.name".to_owned());
-        }
-        match rv.key.host {
-            Host::Remote(RemoteHost { name }) if name == "" => {
-                return Err("protobuf Metric empty .key.host.as_RemoteHost.name".to_owned());
-            }
-            _ => (),
-        }
 
         Ok(rv)
     }
 
-    pub fn as_protobuf(&self) -> Result<collector::Metric, String> {
+    pub fn to_protobuf(&self) -> Result<collector::Metric, String> {
         Ok(collector::Metric {
-            name: self.key.name.clone(),
-            from_host: match &self.key.host {
-                Host::Local => Some(collector::Host{
-                    // TODO: This should probably not be hidden in here.
-                    name: hostname::get().unwrap().into_string().unwrap()
-                }),
-                Host::Remote(RemoteHost { name, }) => Some(collector::Host {
-                    name: name.clone(),
-                }),
-            },
+            key: Some(self.key.to_protobuf()?),
             latest: match self.latest.as_ref() {
                 None => None,
                 Some(dp) => Some(collector::DataPoint {

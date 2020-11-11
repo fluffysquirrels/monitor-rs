@@ -10,6 +10,8 @@ pub mod scheduler;
 mod signal;
 
 pub mod collector {
+    //! Protobuf types for the Collector service
+
     tonic::include_proto!("collector");
 }
 
@@ -57,6 +59,46 @@ impl MetricKey {
                     Host::Local => "local",
                     Host::Remote(RemoteHost { name: hostname }) => &hostname,
                 })
+    }
+
+    pub fn to_protobuf(&self) -> Result<collector::MetricKey, String> {
+        Ok(collector::MetricKey {
+            name: self.name.clone(),
+            from_host: Some(collector::Host {
+                name: match &self.host {
+                    Host::Local =>
+                        // TODO: This should probably not be hidden in here.
+                        hostname::get()
+                                 .map_err(|e| format!("Error getting hostname: {:?}", e))?
+                                 .into_string()
+                                 .map_err(|os| format!("Error converting hostname: {:?}", os))?,
+                    Host::Remote(RemoteHost { name, }) => name.clone(),
+                },
+            }),
+        })
+    }
+
+    pub fn from_protobuf(p: &collector::MetricKey) -> Result<MetricKey, String> {
+        let rv = MetricKey {
+            name: p.name.clone(),
+            host: Host::Remote(RemoteHost {
+                name: p.from_host.as_ref()
+                       .ok_or_else(|| "protobuf MetricKey missing .from_host".to_owned())?
+                       .name.clone(),
+            })
+        };
+
+        if rv.name == "" {
+            return Err("protobuf MetricKey empty .name".to_owned());
+        }
+        match rv.host {
+            Host::Remote(RemoteHost { name }) if name == "" => {
+                return Err("protobuf MetricKey empty .host.as_RemoteHost.name".to_owned());
+            }
+            _ => (),
+        }
+
+        Ok(rv)
     }
 }
 
@@ -371,5 +413,18 @@ fn chrono_datetime_to_protobuf(t: &chrono::DateTime<chrono::Utc>
     Ok(collector::Time {
         epoch_millis: t.timestamp_millis(),
         nanos: t.timestamp_subsec_nanos() % 1_000_000,
+    })
+}
+
+fn std_time_duration_from_protobuf(d: &collector::Duration
+) -> Result<std::time::Duration, String> {
+    Ok(std::time::Duration::new(d.secs, d.nanos))
+}
+
+fn std_time_duration_to_protobuf(d: &std::time::Duration
+) -> Result<collector::Duration, String> {
+    Ok(collector::Duration {
+        secs: d.as_secs(),
+        nanos: d.subsec_nanos(),
     })
 }
