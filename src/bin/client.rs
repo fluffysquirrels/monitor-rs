@@ -123,7 +123,7 @@ fn config() -> config::Client {
         shell_metrics: shell_metric_configs(),
         remote_syncs: vec![
             config::RemoteSync {
-                url: "https://mf:8080".to_owned(),
+                url: "https://mf:443".to_owned(),
                 server_ca: config::TlsCertificate {
                     cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
                 },
@@ -133,7 +133,7 @@ fn config() -> config::Client {
                 },
             },
             config::RemoteSync {
-                url: "https://f1:80".to_owned(),
+                url: "https://f1:443".to_owned(),
                 server_ca: config::TlsCertificate {
                     cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
                 },

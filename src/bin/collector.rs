@@ -34,7 +34,7 @@ async fn main() {
 
     sched.lock().unwrap().spawn();
 
-    let addr: std::net::SocketAddr = "0.0.0.0:8080".parse().unwrap();
+    let addr: std::net::SocketAddr = "0.0.0.0:8443".parse().unwrap();
     let collector_service = CollectorService {
         log_store: ls.clone(),
         metric_store: ms.clone(),
