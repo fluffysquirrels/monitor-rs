@@ -146,21 +146,21 @@ fn config() -> config::Client {
         remote_checks: vec![
             config::RemoteCheck {
                 name: "travis.github.fluffysquirrels/framed-rs.master.passed".to_owned(),
-                host_name: "instance-1".to_owned(),
+                host_name: "f1".to_owned(),
             },
             config::RemoteCheck {
                 name: "travis.github.fluffysquirrels/mqtt-async-client-rs.master.passed"
                           .to_owned(),
-                host_name: "instance-1".to_owned(),
+                host_name: "f1".to_owned(),
             },
             config::RemoteCheck {
                 name: "travis.github.fluffysquirrels/webdriver_client_rust.master.passed"
                           .to_owned(),
-                host_name: "instance-1".to_owned(),
+                host_name: "f1".to_owned(),
             },
             config::RemoteCheck {
                 name: "zfs.mf.healthy".to_owned(),
-                host_name: "MicroFridge".to_owned(),
+                host_name: "mf".to_owned(),
             },
         ]
     }
@@ -310,8 +310,8 @@ fn build_ui(
         });
 
         rx.attach(Some(&ui_thread), move |metric| {
-            if let Some(DataPoint { val, .. }) = metric.latest() {
-                let ui_metric = ui.metrics.get(metric.key());
+            if let Some(DataPoint { val, .. }) = &metric.latest {
+                let ui_metric = ui.metrics.get(&metric.key);
                 if let Some(ui_metric) = ui_metric {
                     if let MetricValue::OkErr(ok) = val {
                         ui_metric.label_status.set_markup(match ok {
@@ -447,7 +447,7 @@ impl rt_graph::DataSource for MetricStoreDataSource {
         let m = self.ms.lock().unwrap().query_one(&self.metric_key);
         let res = match m {
             Some(m) => {
-                let dp = m.latest();
+                let dp = m.latest.as_ref();
                 match dp {
                     Some(DataPoint { val, time }) => {
                         if self.last.is_none() ||

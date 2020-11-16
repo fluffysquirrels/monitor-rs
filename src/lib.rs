@@ -2,8 +2,8 @@
 extern crate log;
 
 pub mod config;
-mod log_store;
-mod metric_store;
+pub mod log_store;
+pub mod metric_store;
 mod notifier;
 pub mod remote_sync;
 pub mod scheduler;
@@ -371,12 +371,12 @@ pub fn connect_metric_to_notifier(
                     host: Host::Local,
                 })
                 .connect(move |m| {
-                    let val: i64 = m.latest().unwrap()
+                    let val: i64 = m.latest.as_ref().unwrap()
                         .val.as_i64().expect("Only int checks so far");
                     let ok = check.is_value_ok(val);
                     debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
-                           m.key().display_name(), val, check, ok);
-                    nc.lock().unwrap().update_metric(&m.key().display_name(), ok);
+                           m.key.display_name(), val, check, ok);
+                    nc.lock().unwrap().update_metric(&m.key.display_name(), ok);
                     Continue::Continue
                 });
         },
@@ -392,8 +392,9 @@ pub fn connect_all_checks_to_notifier(
         .update_signal_for_all()
         .connect(move |m|
                  {
-                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. }) = m.latest() {
-                         nc.lock().unwrap().update_metric(&m.key().display_name(), *ok);
+                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. })
+                             = m.latest.as_ref() {
+                         nc.lock().unwrap().update_metric(&m.key.display_name(), *ok);
                      }
                      Continue::Continue
                  });

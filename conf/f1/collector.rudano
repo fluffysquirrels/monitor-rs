@@ -1,4 +1,5 @@
 Collector {
+    host_name: "f1",
     shell_checks: [
         ShellCheck {
             name: "travis.github.fluffysquirrels/mqtt-async-client-rs.master.passed",

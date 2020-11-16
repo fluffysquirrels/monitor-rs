@@ -1,8 +1,9 @@
 use crate::{Host, MetricKey, OkErr, RemoteHost};
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Collector {
+    pub host_name: String,
     pub shell_checks: Vec<ShellCheck>,
     pub shell_metrics: Vec<ShellMetric>,
     pub server_tls_identity: Option<TlsIdentity>,

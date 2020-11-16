@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug)]
 pub struct Metric {
-    latest: Option<DataPoint>,
-    key: MetricKey,
+    pub latest: Option<DataPoint>,
+    pub key: MetricKey,
 }
 
 struct MetricState {
@@ -25,16 +25,6 @@ struct MetricState {
 pub struct MetricStore {
     metrics: BTreeMap<MetricKey, MetricState>,
     update_signal_for_all: Signal<Metric>,
-}
-
-impl Metric {
-    pub fn latest(&self) -> Option<&DataPoint> {
-        self.latest.as_ref()
-    }
-
-    pub fn key(&self) -> &MetricKey {
-        &self.key
-    }
 }
 
 impl MetricStore {

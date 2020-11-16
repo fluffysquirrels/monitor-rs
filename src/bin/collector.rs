@@ -7,8 +7,11 @@ use monitor::{
     Continue,
     create_shell_checks,
     // create_shell_metrics,
-    LogStore,
-    MetricStore,
+    Host,
+    log_store::{self, LogStore},
+    MetricKey,
+    metric_store::{self, MetricStore},
+    RemoteHost,
     scheduler::Scheduler,
 };
 use std::sync::{Arc, Mutex};
@@ -25,17 +28,15 @@ async fn main() {
 
     let ls = Arc::new(Mutex::new(LogStore::new()));
     let ms = Arc::new(Mutex::new(MetricStore::new()));
-    // let n = Arc::new(Mutex::new(Notifier::new()));
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
     create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
-
-    // connect_all_checks_to_notifier(&ms, &n);
 
     sched.lock().unwrap().spawn();
 
     let addr: std::net::SocketAddr = "0.0.0.0:8443".parse().unwrap();
     let collector_service = CollectorService {
+        config: config.clone(),
         log_store: ls.clone(),
         metric_store: ms.clone(),
     };
@@ -85,6 +86,7 @@ fn tls_config(config: &config::Collector
 }
 
 struct CollectorService {
+    config: config::Collector,
     log_store: Arc<Mutex<LogStore>>,
     metric_store: Arc<Mutex<MetricStore>>,
 }
@@ -99,7 +101,7 @@ impl collector_server::Collector for CollectorService {
         trace!(concat!("CollectorService::get_metrics",
                        "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
         let metrics = self.metric_store.lock().unwrap().query_all();
-        let metrics = metrics.iter().map(|m| m.to_protobuf())
+        let metrics = metrics.iter().map(|m| metric_to_remote(m, &self.config))
                              .collect::<Result<Vec<collector::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics to_protobuf error: {}", e);
@@ -125,7 +127,7 @@ impl collector_server::Collector for CollectorService {
         // Lock the metric store until we've sent all initial values and registered our listener
         let mut lock = self.metric_store.lock().unwrap();
         let metrics = lock.query_all()
-                          .iter().map(|m| m.to_protobuf())
+                          .iter().map(|m| metric_to_remote(m, &self.config))
                           .collect::<Result<Vec<collector::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics to_protobuf error: {}", e);
@@ -140,8 +142,9 @@ impl collector_server::Collector for CollectorService {
         // Wrap in a mutex to keep the borrow checker happy that we're using a
         // &mut method on a captured variable in an Fn closure.
         let tx = Mutex::new(tx);
+        let config = self.config.clone();
         lock.update_signal_for_all().connect(move |metric| {
-            let metric_proto = match metric.to_protobuf() {
+            let metric_proto = match metric_to_remote(&metric, &config) {
                 Err(e) => {
                     error!("stream_metrics: failed to encode as protobuf: {}", e);
                     return Continue::Continue;
@@ -151,13 +154,13 @@ impl collector_server::Collector for CollectorService {
             match tx.lock().unwrap().try_send(Ok(metric_proto)) {
                 Err(tokio::sync::mpsc::error::TrySendError::Full(_)) =>
                     error!("stream_metrics: channel full key={}",
-                           metric.key().display_name()),
+                           metric.key.display_name()),
                 Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
                     debug!("stream_metrics: channel closed");
                     return Continue::Disconnect;
                 }
                 Ok(()) =>
-                    trace!("stream_metrics: sent metric key=`{}'", metric.key().display_name()),
+                    trace!("stream_metrics: sent metric key=`{}'", metric.key.display_name()),
             };
             Continue::Continue
         });
@@ -177,7 +180,7 @@ impl collector_server::Collector for CollectorService {
         // Lock the log store until we've sent all initial values and registered our listener
         let mut lock = self.log_store.lock().unwrap();
         let logs = lock.query_all()
-                       .map(|m| m.to_protobuf())
+                       .map(|l| log_to_remote(l, &self.config))
                        .collect::<Result<Vec<collector::Log>, String>>();
         if let Err(e) = logs {
             error!("logs to_protobuf error: {}", e);
@@ -192,8 +195,9 @@ impl collector_server::Collector for CollectorService {
         // Wrap in a mutex to keep the borrow checker happy that we're using a
         // &mut method on a captured variable in an Fn closure.
         let tx = Mutex::new(tx);
+        let config = self.config.clone();
         lock.update_signal().connect(move |log| {
-            let log_proto = match log.to_protobuf() {
+            let log_proto = match log_to_remote(&log, &config) {
                 Err(e) => {
                     error!("stream_logs: failed to encode as protobuf: {}", e);
                     return Continue::Continue;
@@ -215,4 +219,30 @@ impl collector_server::Collector for CollectorService {
         });
         Ok(tonic::Response::new(rx))
     }
+}
+
+fn metric_to_remote(m: &metric_store::Metric, config: &config::Collector
+) -> Result<collector::Metric, String> {
+    let mut remote = m.clone();
+    remote.key = metric_key_to_remote(&m.key, config)?;
+    remote.to_protobuf()
+}
+
+fn log_to_remote(l: &log_store::Log, config: &config::Collector
+) -> Result<collector::Log, String> {
+    let mut remote = l.clone();
+    remote.key = metric_key_to_remote(&l.key, config)?;
+    remote.to_protobuf()
+}
+
+fn metric_key_to_remote(mk: &MetricKey, config: &config::Collector) -> Result<MetricKey, String> {
+    Ok(MetricKey {
+        name: mk.name.clone(),
+        host: Host::Remote(RemoteHost {
+            name: match &mk.host {
+                Host::Local => config.host_name.clone(),
+                Host::Remote(RemoteHost { name }) => name.clone(),
+            },
+        }),
+    })
 }

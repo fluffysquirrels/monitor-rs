@@ -1,4 +1,5 @@
 Collector {
+    host_name: "mf",
     shell_checks: [
         ShellCheck {
             name: "zfs.mf.healthy",

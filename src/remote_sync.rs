@@ -124,10 +124,10 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
                         }
                         Ok(m) => m,
                     };
-                    trace!("{} got a metric key=`{}'", log_ctx, metric.key().display_name());
-                    if let Some(latest) = metric.latest() {
+                    trace!("{} got a metric key=`{}'", log_ctx, metric.key.display_name());
+                    if let Some(latest) = metric.latest {
                         ms.lock().unwrap()
-                            .update(&metric.key(), latest.clone())
+                            .update(&metric.key, latest.clone())
                     }
                 },
             };
