@@ -68,11 +68,11 @@ fn shell_check_configs() -> Vec<ShellCheck> {
             cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
             interval: config::Duration::Minutes(2),
         },
-        ShellCheck {
-            name: "zfs.mf.healthy".to_owned(),
-            cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
-            interval: config::Duration::Minutes(2),
-        },
+        // ShellCheck {
+        //     name: "zfs.mf.healthy".to_owned(),
+        //     cmd: "ssh mf /sbin/zpool status -x | grep 'all pools are healthy'".to_owned(),
+        //     interval: config::Duration::Minutes(2),
+        // },
         // check_travis("github", "fluffysquirrels/mqtt-async-client-rs", "master"),
         // check_travis("github", "fluffysquirrels/webdriver_client_rust", "master"),
         // check_travis("github", "fluffysquirrels/framed-rs", "master"),
