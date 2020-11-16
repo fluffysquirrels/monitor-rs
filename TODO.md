@@ -9,7 +9,6 @@
 ## Features
 
 * Remote check syncing over gRPC
-    - Remote sync error logs should show which sync job they belong to
     - Show status of syncing in checks
     - Migrate more mf jobs to collector
     - Notify on all synced metrics.

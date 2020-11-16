@@ -69,7 +69,7 @@ pub fn spawn_jobs_streaming(
     let ms = ms.clone();
     let ls = ls.clone();
     std::thread::Builder::new()
-        .name(format!("metric-sync {}", config.url))
+        .name(format!("remote-sync {}", config.url))
         .spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
                 tokio::join!(run_metric_sync(&config, ms),
@@ -79,7 +79,8 @@ pub fn spawn_jobs_streaming(
 }
 
 async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>>) {
-    debug!("metric-sync connecting endpoint url: {}", &config.url);
+    let log_ctx = format!("metric-sync {}", &config.url);
+    debug!("{} connecting", log_ctx);
     let endpoint = sync_endpoint(config).expect("Building endpoint");
     'retry_all: loop {
         let client =
@@ -87,17 +88,17 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
             .await;
         let mut client = match client {
             Err(e) => {
-                error!("metric-sync connect error: {}", e);
+                error!("{} connect error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
             Ok(c) => c,
         };
-        debug!("metric-sync connected `{}'", config.url);
+        debug!("{}: connected", log_ctx);
         let req = collector::StreamMetricsRequest {};
         let mut stream = match client.stream_metrics(req).await {
             Err(e) => {
-                error!("metric-sync stream_metrics error: {}", e);
+                error!("{} stream_metrics error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
@@ -106,24 +107,24 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
         'next_message: loop {
             match stream.message().await {
                 Err(e) => {
-                    error!("metric-sync message() error: {}", e);
+                    error!("{} message() error: {}", log_ctx, e);
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(None) => {
-                    error!("metric-sync message() was None, stream should be infinte");
+                    error!("{} message() was None, stream should be infinte", log_ctx);
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(Some(metric)) => {
                     let metric = match crate::metric_store::Metric::from_protobuf(&metric) {
                         Err(e) => {
-                            error!("metric-sync error converting protobuf: {}", e);
+                            error!("{} error converting protobuf: {}", log_ctx, e);
                             continue 'next_message;
                         }
                         Ok(m) => m,
                     };
-                    trace!("metric-sync got a metric key=`{}'", metric.key().display_name());
+                    trace!("{} got a metric key=`{}'", log_ctx, metric.key().display_name());
                     if let Some(latest) = metric.latest() {
                         ms.lock().unwrap()
                             .update(&metric.key(), latest.clone())
@@ -135,7 +136,8 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
 }
 
 async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
-    debug!("log-sync connecting endpoint url: {}", &config.url);
+    let log_ctx = format!("log-sync {}", &config.url);
+    debug!("{} connecting", log_ctx);
     let endpoint = sync_endpoint(config).expect("Building endpoint");
     'retry_all: loop {
         let client =
@@ -143,17 +145,17 @@ async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
             .await;
         let mut client = match client {
             Err(e) => {
-                error!("log-sync connect error: {}", e);
+                error!("{} connect error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
             Ok(c) => c,
         };
-        debug!("log-sync connected `{}'", config.url);
+        debug!("{} connected", log_ctx);
         let req = collector::StreamLogsRequest {};
         let mut stream = match client.stream_logs(req).await {
             Err(e) => {
-                error!("log-sync stream_logs error: {}", e);
+                error!("{} stream_logs error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
@@ -162,24 +164,24 @@ async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
         'next_message: loop {
             match stream.message().await {
                 Err(e) => {
-                    error!("log-sync message() error: {}", e);
+                    error!("{} message() error: {}", log_ctx, e);
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(None) => {
-                    error!("log-sync message() was None, stream should be infinte");
+                    error!("{} message() was None, stream should be infinte", log_ctx);
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(Some(log)) => {
                     let log = match crate::log_store::Log::from_protobuf(&log) {
                         Err(e) => {
-                            error!("log-sync error converting protobuf: {}", e);
+                            error!("{} error converting protobuf: {}", log_ctx, e);
                             continue 'next_message;
                         }
                         Ok(m) => m,
                     };
-                    trace!("log-sync got a log key=`{}'", log.key.display_name());
+                    trace!("{} got a log key=`{}'", log_ctx, log.key.display_name());
                     ls.lock().unwrap().update(log);
                 },
             };
