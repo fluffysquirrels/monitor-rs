@@ -8,6 +8,7 @@ use monitor::{
     create_shell_checks,
     create_shell_metrics,
     DataPoint,
+    force_check,
     Host,
     LogStore,
     MetricCheck,
@@ -365,11 +366,7 @@ fn ui_for_metric<C>(
     let sched = sched.clone();
     let metric_key_clone = metric_key.to_owned();
     force_btn.connect_clicked(move |_btn| {
-        if let Host::Local = metric_key_clone.host {
-            sched.lock().unwrap().force_run(&metric_key_clone.name);
-        } else {
-            error!("Forcing remote checks is not yet supported");
-        }
+        force_check(&metric_key_clone, &sched)
     });
 
     let show_graph_btn = gtk::ButtonBuilder::new()

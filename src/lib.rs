@@ -400,6 +400,28 @@ pub fn connect_all_checks_to_notifier(
                  });
 }
 
+pub fn force_check(mk: &MetricKey, sched: &Arc<Mutex<Scheduler>>) {
+    if let Host::Local = mk.host {
+        if let Err(e) = sched.lock().unwrap().force_run(&mk.name) {
+            error!("Error on force run: {}", e);
+        }
+    } else {
+        // Calculate which RemoteSync the check came from.
+
+        // Find a client to that RemoteSync from a pool
+        // Pool API:
+        //   - get (clones existing or makes new)
+        //   - get_new (kills existing (on error) and makes new)
+        //   - return ?
+        // Pool needs its own tokio runtime to run the pool (for keepalives, maybe
+        // maintenance messages)
+
+        // Issue a ForceRun rpc.
+
+        error!("Forcing remote checks is not yet supported");
+    }
+}
+
 fn chrono_datetime_from_protobuf(t: &collector::Time
 ) -> Result<chrono::DateTime<chrono::Utc>, String> {
     let epoch = chrono::Utc.ymd(1970, 1, 1).and_hms(0, 0, 0);

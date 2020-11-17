@@ -56,17 +56,17 @@ impl Scheduler {
         };
     }
 
-    pub fn force_run(&mut self, job_name: &str) {
+    pub fn force_run(&mut self, job_name: &str) -> Result<(), Box<dyn std::error::Error>> {
         let mut states = self.states.lock().unwrap();
-        let j = states
-                    .get_mut(job_name)
-                    .expect("To find the job");
+        let j = states.get_mut(job_name)
+                      .ok_or_else(|| format!("Didn't find the scheduler job '{}'", job_name))?;
         j.force_run = true;
         if let Some(t) = self.job_thread.as_ref() {
             if t.tx.send(ThreadMessage::ForceRun).is_err() {
                 error!("Error sending scheduler::ThreadMessage::ForceRun, remote end is dropped");
             }
         };
+        Ok(())
     }
 
     pub fn spawn(&mut self) {
