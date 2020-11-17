@@ -1,10 +1,22 @@
 # TODO
 
+## WIP
+
+* Collector client pool
+  Pool API:
+    - get (clones existing or makes new)
+    - get_new (kills existing (on error) and makes new)
+    - return ?
+  Pool needs its own tokio runtime to run the pool (for keepalives, maybe
+  maintenance messages)
+    * Use pool clients for remote sync
+* Force remote checks
+
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Lots of `unwrap()`s that should return errors, use clippy.
+* Lots of `unwrap()`s, `expect()`s that should return errors, use clippy.
 
 ## Features
 
@@ -16,6 +28,14 @@
     - Show synced metrics in UI.
         - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
     - Force remote checks and metrics
+        - To map between RemoteSync (currently from sync URL hostname)
+          and MetricKey (currently from hostname::get()):
+            - Update MetricKey on deserialising with the host that it
+              came from (does this work for checks multiple hops away? do we care?)
+                - In the sync functions or in from_protobuf?
+                - Why bother with sending a hostname over in the rpc?
+            - Add hostname as config option to collector (we already
+              have enough info to avoid a new config option)
     - What happens when the collector or client is overloaded? How would we shed load?
         - Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
           and `try_send` will fail. Could test this by not reading from the client side.
@@ -36,14 +56,18 @@
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
   [rsedis](https://github.com/seppo0010/rsedis) and
   [redis-rs](https://github.com/mitsuhiko/redis-rs) could be nice for real-time pubsub.
+* CI
+* Log shipping
 
 ## Improvements
 
+* Measure latency between a forced check request and its metric and log being published,
+  including for remote checks.
+* Lots of duplication between syncing logs and metrics. Revisit a `table` abstraction.
 * Use one HTTP/2 connection per remote-sync (share between metrics and logs).
-* Fix up port numbers.
 * Consider separate Cargo.tomls for client and collector, so collector can build
   without gtk.
-* `metric_store::Metric::as_protobuf` sets hostname while encoding: this
+* `metric_store::Metric::to_protobuf` sets hostname while encoding: this
   should probably not be hidden in here.
 * More of a visual separator in the GUI between metrics to help show
   which check the buttons belong to.
@@ -55,9 +79,9 @@
   `O(log n)` time each, rather than iterating through all jobs frequently in
   `O(n)` time.
 * `Scheduler` can sleep more intelligently: until the next job is due.
-* Load metrics, checks from a config file, with hot reload. Maybe use
-  [RON](https://github.com/ron-rs/ron) or
-  [rudano](https://crates.io/crates/rudano)?
+* Load testing.
+  [ghz](https://github.com/bojand/ghz) was good for request-response
+  rpc's, didn't seem to work for streaming
 
 ## Questions
 
