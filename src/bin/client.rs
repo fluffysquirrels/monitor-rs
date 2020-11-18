@@ -17,7 +17,7 @@ use monitor::{
     MetricValue,
     Notifier,
     OkErr,
-    remote_sync,
+    remote,
     scheduler::Scheduler,
 };
 use gio::prelude::*;
@@ -187,9 +187,9 @@ fn main() {
 
     connect_all_checks_to_notifier(&ms, &n);
 
-    for rsc in config.remote_syncs.iter() {
-        remote_sync::spawn_jobs_streaming(&rsc, &ls, &ms);
-    }
+    let remotes = remote::Remotes::from_configs(&config.remote_syncs)
+                                  .expect("RemoteSync configs OK");
+    remote::spawn_sync_jobs(&remotes, &ls, &ms);
 
     sched.lock().unwrap().spawn();
 

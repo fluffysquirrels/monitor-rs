@@ -1,4 +1,4 @@
-use crate::{Host, MetricKey, OkErr, RemoteHost};
+use crate::{BoxError, Host, MetricKey, OkErr, RemoteHost};
 use serde::{Serialize, Deserialize};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -30,7 +30,7 @@ pub struct TlsCertificate {
 }
 
 impl TlsIdentity {
-    pub fn load(&self) -> Result<tonic::transport::Identity, Box<dyn std::error::Error>> {
+    pub fn load(&self) -> Result<tonic::transport::Identity, BoxError> {
         Ok(tonic::transport::Identity::from_pem(
               std::fs::read(&self.cert_path)?,
               std::fs::read(&self.key_path)?))
@@ -38,7 +38,7 @@ impl TlsIdentity {
 }
 
 impl TlsCertificate {
-    pub fn load(&self) -> Result<tonic::transport::Certificate, Box<dyn std::error::Error>> {
+    pub fn load(&self) -> Result<tonic::transport::Certificate, BoxError> {
         Ok(tonic::transport::Certificate::from_pem(
               std::fs::read(&self.cert_path)?))
     }

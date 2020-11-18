@@ -6,7 +6,7 @@ pub mod config;
 pub mod log_store;
 pub mod metric_store;
 mod notifier;
-pub mod remote_sync;
+pub mod remote;
 pub mod scheduler;
 mod signal;
 
@@ -28,6 +28,8 @@ pub use crate::{
 use chrono::TimeZone;
 use process_control::{ChildExt, Timeout};
 use std::sync::{Arc, Mutex};
+
+pub type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OkErr {

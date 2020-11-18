@@ -2,6 +2,7 @@
 extern crate log;
 
 use monitor::{
+    BoxError,
     collector::{self, collector_server},
     config,
     Continue,
@@ -70,7 +71,7 @@ fn load_config() -> config::Collector {
 }
 
 fn tls_config(config: &config::Collector
-) -> Result<Option<tonic::transport::ServerTlsConfig>, Box<dyn std::error::Error>> {
+) -> Result<Option<tonic::transport::ServerTlsConfig>, BoxError> {
     let identity_config = match config.server_tls_identity.as_ref() {
         None => return Ok(None),
         Some(idc) => idc,

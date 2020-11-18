@@ -1,82 +1,78 @@
 use crate::{
+    BoxError,
     collector,
     collector_pool,
     config,
     LogStore,
     MetricStore,
 };
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
-// pub fn add_remote_sync_job_polling(
-//     config: &config::RemoteSync,
-//     ms: &Arc<Mutex<MetricStore>>,
-//     sched: &Arc<Mutex<Scheduler>>)
-// {
-//     // TODO: Cache connection and re-use between invocations.
-//
-//     let config = config.clone();
-//     let ms = ms.clone();
-//     let j = scheduler::JobDefinition {
-//         interval: chrono::Duration::seconds(5),
-//         name: format!("remote-sync.{}", &config.url),
-//         f: Arc::new(Mutex::new(move |_rc| {
-//             debug!("Remote sync connecting endpoint url: {}", &config.url);
-//             let endpoint = tonic::transport::Endpoint::from_shared(config.url.clone()).unwrap();
-//             let config = config.clone();
-//             let ms = ms.clone();
-//             let fut = async move {
-//                 let mut client = collector::collector_client::CollectorClient::connect(endpoint)
-//                     .await?;
-//                 debug!("Remote sync polling `{}'", config.url);
-//                 let req = collector::GetMetricsRequest {};
-//                 let metrics = client.get_metrics(req).await?;
-//                 trace!("Remote sync got metrics");
-//                 trace!("metrics: {:#?}", metrics);
-//                 let metrics = metrics.into_inner().metrics.iter()
-//                                      .map(|m| metric_store::Metric::from_protobuf(m))
-//                                      .collect::<Result<Vec<metric_store::Metric>, String>>()?;
-//                 debug!("Remote sync unmarshalled metrics");
-//                 trace!("metrics: {:#?}", metrics);
-//
-//                 { // Scope the lock on ms.
-//                     let mut msl = ms.lock().unwrap();
-//                     for m in metrics.iter() {
-//                         if let Some(latest) = m.latest() {
-//                             msl.update(&m.key(), latest.clone())
-//                         }
-//                     }
-//                 }
-//                 Ok(())
-//             };
-//             // Spinning up a tokio runtime takes ~300us, so caching a
-//             // runtime somewhere might be nice but isn't required.
-//             let mut rt = tokio::runtime::Runtime::new().unwrap();
-//             let res: Result<(), Box<dyn std::error::Error>> = rt.block_on(fut);
-//             if let Err(e) = res {
-//                 error!("Remote sync error = {}", e);
-//             }
-//         }))
-//     };
-//
-//     sched.lock().unwrap().add(j);
-// }
+pub struct Remotes {
+    by_host_name: BTreeMap<String, Remote>,
+}
 
-pub fn spawn_jobs_streaming(
-    config: &config::RemoteSync,
+impl Remotes {
+    pub fn from_configs(configs: &[config::RemoteSync]) -> Result<Remotes, BoxError> {
+        let mut by_host_name = BTreeMap::<String, Remote>::new();
+        for config in configs.iter() {
+            let url = config.url.parse::<tonic::transport::Uri>()?;
+            let host = url.host().ok_or("Missing endpoint URL host")?;
+            let new_remote = Remote::from_config(config.clone())?;
+            if let Some(_old) = by_host_name.insert(host.to_owned(), new_remote) {
+                return Err(format!("Duplicate remote host `{}'", host).into());
+            }
+        }
+        Ok(Remotes {
+            by_host_name,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct Remote {
+    config: config::RemoteSync,
+    pool: Arc<collector_pool::Pool>,
+}
+
+impl Remote {
+    pub fn from_config(config: config::RemoteSync) -> Result<Remote, BoxError> {
+        let endpoint = sync_endpoint(&config)?;
+        let pool = Arc::new(collector_pool::Pool::new(endpoint));
+        Ok(Remote {
+            config,
+            pool,
+        })
+    }
+}
+
+pub fn spawn_sync_jobs(
+    remotes: &Remotes,
     ls: &Arc<Mutex<LogStore>>,
     ms: &Arc<Mutex<MetricStore>>
 ) {
-    let config = config.clone();
-    let endpoint = sync_endpoint(&config).expect("RemoteSync config to be OK");
-    let pool = Arc::new(collector_pool::Pool::new(endpoint));
+    for remote in remotes.by_host_name.values() {
+        spawn_one_sync_jobs(remote, ls, ms);
+    }
+}
+
+fn spawn_one_sync_jobs(
+    remote: &Remote,
+    ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>
+) {
     let ms = ms.clone();
     let ls = ls.clone();
+    let remote = remote.clone();
     std::thread::Builder::new()
-        .name(format!("remote-sync {}", &config.url))
+        .name(format!("remote-sync {}", &remote.config.url))
         .spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                tokio::join!(run_metric_sync(&config, pool.clone(), ms),
-                             run_log_sync(&config, pool.clone(), ls))
+                tokio::join!(run_metric_sync(&remote.config, remote.pool.clone(), ms),
+                             run_log_sync(&remote.config, remote.pool.clone(), ls))
             });
         }).unwrap();
 }
@@ -199,7 +195,7 @@ async fn run_log_sync(
 }
 
 fn sync_endpoint(config: &config::RemoteSync
-) -> Result<tonic::transport::Endpoint, Box<dyn std::error::Error>> {
+) -> Result<tonic::transport::Endpoint, BoxError> {
     let url = config.url.parse::<tonic::transport::Uri>()?;
     let host = url.host().ok_or("Missing endpoint URL host")?;
     let scheme = url.scheme().ok_or("Missing endpoint URL host")?;
