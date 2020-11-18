@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate log;
 
+pub mod collector_pool;
 pub mod config;
 pub mod log_store;
 pub mod metric_store;

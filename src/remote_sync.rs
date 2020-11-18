@@ -1,5 +1,6 @@
 use crate::{
     collector,
+    collector_pool,
     config,
     LogStore,
     MetricStore,
@@ -66,27 +67,29 @@ pub fn spawn_jobs_streaming(
     ms: &Arc<Mutex<MetricStore>>
 ) {
     let config = config.clone();
+    let endpoint = sync_endpoint(&config).expect("RemoteSync config to be OK");
+    let pool = Arc::new(collector_pool::Pool::new(endpoint));
     let ms = ms.clone();
     let ls = ls.clone();
     std::thread::Builder::new()
-        .name(format!("remote-sync {}", config.url))
+        .name(format!("remote-sync {}", &config.url))
         .spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                tokio::join!(run_metric_sync(&config, ms),
-                             run_log_sync(&config, ls))
+                tokio::join!(run_metric_sync(&config, pool.clone(), ms),
+                             run_log_sync(&config, pool.clone(), ls))
             });
         }).unwrap();
 }
 
-async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>>) {
+async fn run_metric_sync(
+    config: &config::RemoteSync,
+    pool: Arc<collector_pool::Pool>,
+    ms: Arc<Mutex<MetricStore>>
+) {
     let log_ctx = format!("metric-sync {}", &config.url);
-    debug!("{} connecting", log_ctx);
-    let endpoint = sync_endpoint(config).expect("Building endpoint");
     'retry_all: loop {
-        let client =
-            collector::collector_client::CollectorClient::connect(endpoint.clone())
-            .await;
-        let mut client = match client {
+        debug!("{} connecting", log_ctx);
+        let mut client = match pool.get().await {
             Err(e) => {
                 error!("{} connect error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
@@ -96,9 +99,10 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
         };
         debug!("{}: connected", log_ctx);
         let req = collector::StreamMetricsRequest {};
-        let mut stream = match client.stream_metrics(req).await {
+        let mut stream = match client.get().stream_metrics(req).await {
             Err(e) => {
                 error!("{} stream_metrics error: {}", log_ctx, e);
+                pool.discard_faulted(client).await;
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
@@ -108,11 +112,13 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
             match stream.message().await {
                 Err(e) => {
                     error!("{} message() error: {}", log_ctx, e);
+                    pool.discard_faulted(client).await;
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(None) => {
                     error!("{} message() was None, stream should be infinte", log_ctx);
+                    pool.discard_faulted(client).await;
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
@@ -135,15 +141,15 @@ async fn run_metric_sync(config: &config::RemoteSync, ms: Arc<Mutex<MetricStore>
     }
 }
 
-async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
+async fn run_log_sync(
+    config: &config::RemoteSync,
+    pool: Arc<collector_pool::Pool>,
+    ls: Arc<Mutex<LogStore>>
+) {
     let log_ctx = format!("log-sync {}", &config.url);
-    debug!("{} connecting", log_ctx);
-    let endpoint = sync_endpoint(config).expect("Building endpoint");
     'retry_all: loop {
-        let client =
-            collector::collector_client::CollectorClient::connect(endpoint.clone())
-            .await;
-        let mut client = match client {
+        debug!("{} connecting", log_ctx);
+        let mut client = match pool.get().await {
             Err(e) => {
                 error!("{} connect error: {}", log_ctx, e);
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
@@ -153,9 +159,10 @@ async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
         };
         debug!("{} connected", log_ctx);
         let req = collector::StreamLogsRequest {};
-        let mut stream = match client.stream_logs(req).await {
+        let mut stream = match client.get().stream_logs(req).await {
             Err(e) => {
                 error!("{} stream_logs error: {}", log_ctx, e);
+                pool.discard_faulted(client).await;
                 tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                 continue 'retry_all;
             },
@@ -165,11 +172,13 @@ async fn run_log_sync(config: &config::RemoteSync, ls: Arc<Mutex<LogStore>>) {
             match stream.message().await {
                 Err(e) => {
                     error!("{} message() error: {}", log_ctx, e);
+                    pool.discard_faulted(client).await;
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }
                 Ok(None) => {
                     error!("{} message() was None, stream should be infinte", log_ctx);
+                    pool.discard_faulted(client).await;
                     tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
                     continue 'retry_all;
                 }

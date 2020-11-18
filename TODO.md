@@ -2,15 +2,8 @@
 
 ## WIP
 
-* Collector client pool
-  Pool API:
-    - get (clones existing or makes new)
-    - get_new (kills existing (on error) and makes new)
-    - return ?
-  Pool needs its own tokio runtime to run the pool (for keepalives, maybe
-  maintenance messages)
-    * Use pool clients for remote sync
 * Force remote checks
+    - Use client collector pool.
 
 ## Bugs
 
@@ -63,8 +56,8 @@
 
 * Measure latency between a forced check request and its metric and log being published,
   including for remote checks.
-* Lots of duplication between syncing logs and metrics. Revisit a `table` abstraction.
-* Use one HTTP/2 connection per remote-sync (share between metrics and logs).
+* Lots of duplication between remote syncing logs and metrics. Revisit a `table` abstraction.
+* Duplication in remote syncing in error cases: handle at top of loop or in wrapper function?
 * Consider separate Cargo.tomls for client and collector, so collector can build
   without gtk.
 * More of a visual separator in the GUI between metrics to help show
