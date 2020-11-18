@@ -67,11 +67,7 @@ impl MetricKey {
             from_host: Some(collector::Host {
                 name: match &self.host {
                     Host::Local =>
-                        // TODO: This should probably not be hidden in here.
-                        hostname::get()
-                                 .map_err(|e| format!("Error getting hostname: {:?}", e))?
-                                 .into_string()
-                                 .map_err(|os| format!("Error converting hostname: {:?}", os))?,
+                        return Err("Missing hostname in MetricKey::to_protobuf".to_owned()),
                     Host::Remote(RemoteHost { name, }) => name.clone(),
                 },
             }),

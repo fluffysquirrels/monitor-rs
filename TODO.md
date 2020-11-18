@@ -67,8 +67,6 @@
 * Use one HTTP/2 connection per remote-sync (share between metrics and logs).
 * Consider separate Cargo.tomls for client and collector, so collector can build
   without gtk.
-* `metric_store::Metric::to_protobuf` sets hostname while encoding: this
-  should probably not be hidden in here.
 * More of a visual separator in the GUI between metrics to help show
   which check the buttons belong to.
 * `MetricStoreDataSource` should use time for `Point.t`.
