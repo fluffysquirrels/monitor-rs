@@ -399,25 +399,48 @@ pub fn connect_all_checks_to_notifier(
                  });
 }
 
-pub fn force_check(mk: &MetricKey, sched: &Arc<Mutex<Scheduler>>) {
-    if let Host::Local = mk.host {
-        if let Err(e) = sched.lock().unwrap().force_run(&mk.name) {
-            error!("Error on force run: {}", e);
+pub fn force_check(mk: &MetricKey, remotes: &Arc<remote::Remotes>, sched: &Arc<Mutex<Scheduler>>) {
+    match &mk.host {
+        Host::Local => {
+            if let Err(e) = sched.lock().unwrap().force_run(&mk.name) {
+                error!("Error on force run: {}", e);
+            }
+        },
+        Host::Remote(RemoteHost { name, }) => {
+            let remote = match remotes.find_by_host(&name) {
+                Some(r) => r,
+                None => {
+                    error!("Remote not found for host `{}'", &name);
+                    return;
+                }
+            };
+            let pool = remote.pool();
+            let url = remote.config().url.clone();
+            let mk = mk.clone();
+            // TODO: Probably re-use some existing tokio runtime.
+            std::thread::Builder::new()
+                .name(format!("force-check {}", &url))
+                .spawn(move || {
+                    tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                        let log_ctx = format!("force-check {}", url);
+                        // TODO: Add retries?
+                        let mut conn = match pool.get().await {
+                            Ok(c) => c,
+                            Err(e) => {
+                                error!("{} error getting connection: {}", log_ctx, e);
+                                return;
+                            }
+                        };
+                        let req = collector::ForceRunRequest {
+                            job_name: mk.name.clone(),
+                        };
+                        if let Err(e) = conn.get().force_run(req).await {
+                            error!("{} force_run error: {}", log_ctx, e);
+                            return;
+                        }
+                    });
+                }).unwrap();
         }
-    } else {
-        // Calculate which RemoteSync the check came from.
-
-        // Find a client to that RemoteSync from a pool
-        // Pool API:
-        //   - get (clones existing or makes new)
-        //   - get_new (kills existing (on error) and makes new)
-        //   - return ?
-        // Pool needs its own tokio runtime to run the pool (for keepalives, maybe
-        // maintenance messages)
-
-        // Issue a ForceRun rpc.
-
-        error!("Forcing remote checks is not yet supported");
     }
 }
 

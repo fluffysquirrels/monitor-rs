@@ -190,6 +190,7 @@ fn main() {
     let remotes = remote::Remotes::from_configs(&config.remote_syncs)
                                   .expect("RemoteSync configs OK");
     remote::spawn_sync_jobs(&remotes, &ls, &ms);
+    let remotes = Arc::new(remotes);
 
     sched.lock().unwrap().spawn();
 
@@ -203,7 +204,8 @@ fn main() {
         let sc = sched.clone();
         let ls = ls.clone();
         let config = config.clone();
-        build_ui(&config, app, ms, sc, ls);
+        let remotes = remotes.clone();
+        build_ui(&config, app, ls, ms, remotes, sc);
     });
 
     application.run(&std::env::args().collect::<Vec<_>>());
@@ -212,9 +214,10 @@ fn main() {
 fn build_ui(
     config: &config::Client,
     application: &gtk::Application,
-    ms: Arc<Mutex<MetricStore>>,
-    sched: Arc<Mutex<Scheduler>>,
     ls: Arc<Mutex<LogStore>>,
+    ms: Arc<Mutex<MetricStore>>,
+    remotes: Arc<remote::Remotes>,
+    sched: Arc<Mutex<Scheduler>>,
 ) {
     let window = gtk::ApplicationWindowBuilder::new()
         .application(application)
@@ -247,19 +250,25 @@ fn build_ui(
 
     for config in config.shell_checks.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
+        let metric_ui = ui_for_metric(
+            &metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
         metrics.insert(key, metric_ui);
     }
 
     for config in config.shell_metrics.iter() {
         let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
+        let metric_ui = ui_for_metric(
+            &metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
         metrics.insert(key, metric_ui);
     }
 
     for config in config.remote_checks.iter() {
         let key = config.to_metric_key();
-        let metric_ui = ui_for_metric(&metrics_box, &gdk_window, &key, &ls, &ms, &sched);
+        let metric_ui = ui_for_metric(
+            &metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
         metrics.insert(key, metric_ui);
     }
 
@@ -335,6 +344,7 @@ fn ui_for_metric<C>(
     metric_key: &MetricKey,
     _ls: &Arc<Mutex<LogStore>>,
     ms: &Arc<Mutex<MetricStore>>,
+    remotes: &Arc<remote::Remotes>,
     sched: &Arc<Mutex<Scheduler>>,
 ) -> MetricUi
     where C: IsA<gtk::Container> + IsA<gtk::Widget>
@@ -363,10 +373,11 @@ fn ui_for_metric<C>(
         .parent(&buttons_box)
         .halign(gtk::Align::Start)
         .build();
-    let sched = sched.clone();
+    let schedc = sched.clone();
+    let remotesc = remotes.clone();
     let metric_key_clone = metric_key.to_owned();
     force_btn.connect_clicked(move |_btn| {
-        force_check(&metric_key_clone, &sched)
+        force_check(&metric_key_clone, &remotesc, &schedc)
     });
 
     let show_graph_btn = gtk::ButtonBuilder::new()

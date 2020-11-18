@@ -2,9 +2,6 @@
 
 ## WIP
 
-* Force remote checks
-    - Use client collector pool.
-
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
@@ -20,15 +17,6 @@
         - Including I64 metrics.
     - Show synced metrics in UI.
         - Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
-    - Force remote checks and metrics
-        - To map between RemoteSync (currently from sync URL hostname)
-          and MetricKey (currently from hostname::get()):
-            - Update MetricKey on deserialising with the host that it
-              came from (does this work for checks multiple hops away? do we care?)
-                - In the sync functions or in from_protobuf?
-                - Why bother with sending a hostname over in the rpc?
-            - Add hostname as config option to collector (we already
-              have enough info to avoid a new config option)
     - What happens when the collector or client is overloaded? How would we shed load?
         - Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
           and `try_send` will fail. Could test this by not reading from the client side.
@@ -54,6 +42,10 @@
 
 ## Improvements
 
+* Force run remote job should probably re-use an existing tokio runtime.
+* Force run remote job should probably retry a few times before failing.
+* apt.upgradable checks should be metrics to show the number of packages upgradable in the UI.
+* Remote sync config should be in an Arc, it's expensive and it's copied a few times.
 * Measure latency between a forced check request and its metric and log being published,
   including for remote checks.
 * Lots of duplication between remote syncing logs and metrics. Revisit a `table` abstraction.

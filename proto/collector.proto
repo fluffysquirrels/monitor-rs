@@ -6,17 +6,24 @@ service Collector {
   rpc GetMetrics (GetMetricsRequest) returns (MetricsReply) {}
   rpc StreamMetrics (StreamMetricsRequest) returns (stream Metric) {}
   rpc StreamLogs (StreamLogsRequest) returns (stream Log) {}
+  rpc ForceRun (ForceRunRequest) returns (ForceRunReply) {}
 }
 
 message GetMetricsRequest {}
+
+message MetricsReply {
+  repeated Metric metrics = 1;
+}
 
 message StreamMetricsRequest {}
 
 message StreamLogsRequest {}
 
-message MetricsReply {
-  repeated Metric metrics = 1;
+message ForceRunRequest {
+  string job_name = 1;
 }
+
+message ForceRunReply {}
 
 message Metric {
   reserved 1, 2;

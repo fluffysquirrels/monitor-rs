@@ -40,6 +40,7 @@ async fn main() {
         config: config.clone(),
         log_store: ls.clone(),
         metric_store: ms.clone(),
+        scheduler: sched.clone(),
     };
     let tls_config = tls_config(&config).expect("Ok TLS config");
     info!("Listening on {}://{}",
@@ -90,6 +91,7 @@ struct CollectorService {
     config: config::Collector,
     log_store: Arc<Mutex<LogStore>>,
     metric_store: Arc<Mutex<MetricStore>>,
+    scheduler: Arc<Mutex<Scheduler>>,
 }
 
 #[tonic::async_trait]
@@ -99,7 +101,7 @@ impl collector_server::Collector for CollectorService {
         request: tonic::Request<collector::GetMetricsRequest>,
     ) -> Result<tonic::Response<collector::MetricsReply>, tonic::Status>
     {
-        trace!(concat!("CollectorService::get_metrics",
+        trace!(concat!("CollectorService::get_metrics\n",
                        "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
         let metrics = self.metric_store.lock().unwrap().query_all();
         let metrics = metrics.iter().map(|m| metric_to_remote(m, &self.config))
@@ -219,6 +221,21 @@ impl collector_server::Collector for CollectorService {
             Continue::Continue
         });
         Ok(tonic::Response::new(rx))
+    }
+
+    async fn force_run(
+        &self,
+        request: tonic::Request<collector::ForceRunRequest>,
+    ) -> Result<tonic::Response<collector::ForceRunReply>, tonic::Status>
+    {
+        trace!(concat!("CollectorService::force_run\n",
+                       "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
+
+        match self.scheduler.lock().unwrap()
+                            .force_run(&request.get_ref().job_name) {
+            Ok(()) => Ok(tonic::Response::new(collector::ForceRunReply {})),
+            Err(e) => Err(tonic::Status::internal(format!("Scheduler error: {}", e))),
+        }
     }
 }
 

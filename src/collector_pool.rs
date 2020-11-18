@@ -1,4 +1,7 @@
-use crate::collector::collector_client::CollectorClient;
+use crate::{
+    BoxError,
+    collector::collector_client::CollectorClient
+};
 use tokio::sync::Mutex;
 
 pub type Client = CollectorClient<tonic::transport::Channel>;
@@ -29,7 +32,7 @@ impl Pool {
         }
     }
 
-    pub async fn get(&self) -> Result<PoolClient, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get(&self) -> Result<PoolClient, BoxError> {
         let mut lock_state = self.state.lock().await;
         if let Some(c) = &lock_state.conn {
             trace!("Re-using pool connection");

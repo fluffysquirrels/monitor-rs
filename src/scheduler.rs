@@ -1,3 +1,4 @@
+use crate::BoxError;
 use std::{
     collections::BTreeMap,
     sync::{Arc, mpsc, Mutex},
@@ -56,7 +57,7 @@ impl Scheduler {
         };
     }
 
-    pub fn force_run(&mut self, job_name: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn force_run(&mut self, job_name: &str) -> Result<(), BoxError> {
         let mut states = self.states.lock().unwrap();
         let j = states.get_mut(job_name)
                       .ok_or_else(|| format!("Didn't find the scheduler job '{}'", job_name))?;

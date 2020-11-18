@@ -30,6 +30,10 @@ impl Remotes {
             by_host_name,
         })
     }
+
+    pub fn find_by_host(&self, host: &str) -> Option<&Remote> {
+        self.by_host_name.get(host)
+    }
 }
 
 #[derive(Clone)]
@@ -46,6 +50,14 @@ impl Remote {
             config,
             pool,
         })
+    }
+
+    pub fn pool(&self) -> Arc<collector_pool::Pool> {
+        self.pool.clone()
+    }
+
+    pub fn config(&self) -> &config::RemoteSync {
+        &self.config
     }
 }
 
