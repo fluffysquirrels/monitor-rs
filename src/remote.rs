@@ -3,8 +3,11 @@ use crate::{
     collector,
     collector_pool,
     config,
+    Host,
     LogStore,
+    MetricKey,
     MetricStore,
+    RemoteHost,
 };
 use std::{
     collections::BTreeMap,
@@ -204,6 +207,49 @@ async fn run_log_sync(
             };
         }
     }
+}
+
+pub fn force_check_remote(mk: &MetricKey, remotes: &Arc<Remotes>) {
+    let host_name = match &mk.host {
+        Host::Local => panic!("Host::Local in force_check_remote"),
+        Host::Remote(RemoteHost { name, }) => name,
+    };
+    let remote = match remotes.find_by_host(&host_name) {
+        Some(r) => r,
+        None => {
+            error!("Remote not found for host `{}'", &host_name);
+            return;
+        }
+    };
+    let pool = remote.pool();
+    let url = remote.config().url.clone();
+    let mk = mk.clone();
+    // TODO: Probably re-use some existing tokio runtime.
+    std::thread::Builder::new()
+        .name(format!("force-check {}", &url))
+        .spawn(move || {
+            tokio::runtime::Runtime::new().unwrap().block_on(async move {
+                let log_ctx = format!("force-check {}", url);
+                trace!("{} getting connection", log_ctx);
+                // TODO: Add retries?
+                let mut conn = match pool.get().await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        error!("{} error getting connection: {}", log_ctx, e);
+                        return;
+                    }
+                };
+                let req = collector::ForceRunRequest {
+                    job_name: mk.name.clone(),
+                };
+                trace!("{} running RPC", log_ctx);
+                if let Err(e) = conn.get().force_run(req).await {
+                    error!("{} force_run error: {}", log_ctx, e);
+                    return;
+                }
+                trace!("{} done", log_ctx);
+            });
+        }).unwrap();
 }
 
 fn sync_endpoint(config: &config::RemoteSync

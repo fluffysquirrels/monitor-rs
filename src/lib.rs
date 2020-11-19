@@ -406,40 +406,8 @@ pub fn force_check(mk: &MetricKey, remotes: &Arc<remote::Remotes>, sched: &Arc<M
                 error!("Error on force run: {}", e);
             }
         },
-        Host::Remote(RemoteHost { name, }) => {
-            let remote = match remotes.find_by_host(&name) {
-                Some(r) => r,
-                None => {
-                    error!("Remote not found for host `{}'", &name);
-                    return;
-                }
-            };
-            let pool = remote.pool();
-            let url = remote.config().url.clone();
-            let mk = mk.clone();
-            // TODO: Probably re-use some existing tokio runtime.
-            std::thread::Builder::new()
-                .name(format!("force-check {}", &url))
-                .spawn(move || {
-                    tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                        let log_ctx = format!("force-check {}", url);
-                        // TODO: Add retries?
-                        let mut conn = match pool.get().await {
-                            Ok(c) => c,
-                            Err(e) => {
-                                error!("{} error getting connection: {}", log_ctx, e);
-                                return;
-                            }
-                        };
-                        let req = collector::ForceRunRequest {
-                            job_name: mk.name.clone(),
-                        };
-                        if let Err(e) = conn.get().force_run(req).await {
-                            error!("{} force_run error: {}", log_ctx, e);
-                            return;
-                        }
-                    });
-                }).unwrap();
+        Host::Remote(_) => {
+            remote::force_check_remote(mk, remotes);
         }
     }
 }
