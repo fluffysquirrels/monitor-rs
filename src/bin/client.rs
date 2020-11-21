@@ -325,11 +325,11 @@ fn build_ui(
                 if let Some(ui_metric) = ui_metric {
                     if let MetricValue::OkErr(ok) = val {
                         ui_metric.label_status.set_markup(match ok {
-                            OkErr::Ok  => " = <span fgcolor='#00cc00'>Ok</span>",
-                            OkErr::Err => " = <span fgcolor='#cc0000'>Err</span>",
+                            OkErr::Ok  => "<span fgcolor='#00cc00'>Ok</span>",
+                            OkErr::Err => "<span fgcolor='#cc0000'>Err</span>",
                         });
                     } else {
-                        ui_metric.label_status.set_text(&format!(" = {}", val));
+                        ui_metric.label_status.set_text(&format!("{}", val));
                     }
                 }
             }
@@ -353,14 +353,14 @@ fn ui_for_metric<C>(
         .parent(container)
         .orientation(gtk::Orientation::Horizontal)
         .build();
-    let _label = gtk::LabelBuilder::new()
-        .label(&metric_key.display_name())
-        .parent(&label_box)
-        .build();
     let label_status = gtk::LabelBuilder::new()
         .parent(&label_box)
         .build();
-    label_status.set_markup(" = <span fgcolor='#cccc00'>?</span>");
+    label_status.set_markup("<span fgcolor='#cccc00'>?</span>");
+    let _label = gtk::LabelBuilder::new()
+        .label(&format!(" = {}", metric_key.display_name()))
+        .parent(&label_box)
+        .build();
 
     let buttons_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Horizontal)
