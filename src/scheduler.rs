@@ -116,13 +116,13 @@ impl Scheduler {
             // Then iterate through the jobs to run.
             for name in to_run.iter() {
                 trace!("Running job `{}'", name);
-                // Lock to get the job work function.
+                // Lock `states` to get the job work function.
                 let f = match states.lock().unwrap().get(name) {
                     // Didn't find the job, so it was removed, continue with the next job.
                     None => continue,
                     Some(s) => s.def.f.clone(),
                 };
-                // f runs without locking.
+                // f runs without locking `states`.
                 (f.lock().unwrap())(RunContext {});
                 {
                     // Lock `states` to write the results.
