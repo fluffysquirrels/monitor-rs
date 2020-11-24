@@ -12,6 +12,7 @@
 
 * Remote check syncing over gRPC
     * Show status of syncing in checks
+        * Show error in log.
     * Migrate more mf jobs to collector
     * Notify on all synced metrics.
         * Including I64 metrics.
@@ -20,8 +21,7 @@
     * What happens when the collector or client is overloaded? How would we shed load?
         * Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
           and `try_send` will fail. Could test this by not reading from the client side.
-* Show i64 metric checks in green for Ok or red for Err.
-* View old logs
+* Show i64 metric checks in green for Ok and passed I64 metric check or red otherwise.
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC
@@ -37,7 +37,7 @@
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
   [rsedis](https://github.com/seppo0010/rsedis) and
   [redis-rs](https://github.com/mitsuhiko/redis-rs) could be nice for real-time pubsub.
-* Keep a history of checks and logs in a DB.
+* Keep a history of checks and logs in a DB. View old logs
 * CI
     * Triggered by a webhook / rpc / force run for a manual check.
     * Stream job stdout log as job progresses
@@ -54,7 +54,7 @@
 
 ## Improvements
 
-* The scheduler detects resume from suspend, it would be nice to force
+* The scheduler detects resume from suspend, it would be nice to restart
   the sync jobs at the same time.
 * Force run remote job should probably re-use an existing tokio runtime.
 * Force run remote job should probably retry a few times before failing.
@@ -63,7 +63,6 @@
 * Measure latency between a forced check request and its metric and log being published,
   including for remote checks.
 * Lots of duplication between remote syncing logs and metrics. Revisit a `table` abstraction.
-* Duplication in remote syncing in error cases: handle at top of loop or in wrapper function?
 * Consider separate Cargo.tomls for client and collector, so collector can build
   without gtk.
 * More of a visual separator in the GUI between metrics to help show
