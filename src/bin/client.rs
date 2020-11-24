@@ -272,6 +272,20 @@ fn build_ui(
         metrics.insert(key, metric_ui);
     }
 
+    for config in config.remote_syncs.iter() {
+        let metrics_key = config.metrics_sync_key();
+        let metrics_metric_ui = ui_for_metric(
+            &metrics_box, &gdk_window, &metrics_key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(metrics_key, metrics_metric_ui);
+
+        let logs_key = config.logs_sync_key();
+        let logs_metric_ui = ui_for_metric(
+            &metrics_box, &gdk_window, &logs_key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(logs_key, logs_metric_ui);
+    }
+
     window.show_all();
     for mui in metrics.values() {
         mui.graph.hide();

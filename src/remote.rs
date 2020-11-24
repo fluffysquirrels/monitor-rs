@@ -3,10 +3,13 @@ use crate::{
     collector,
     collector_pool,
     config,
+    DataPoint,
     Host,
     LogStore,
     MetricKey,
     MetricStore,
+    MetricValue,
+    OkErr,
     RemoteHost,
 };
 use std::{
@@ -86,8 +89,8 @@ fn spawn_one_sync_jobs(
         .name(format!("remote-sync {}", &remote.config.url))
         .spawn(move || {
             tokio::runtime::Runtime::new().unwrap().block_on(async move {
-                tokio::join!(run_metric_sync(&remote.config, remote.pool.clone(), ms),
-                             run_log_sync(&remote.config, remote.pool.clone(), ls))
+                tokio::join!(run_metric_sync(&remote.config, remote.pool.clone(), ms.clone()),
+                             run_log_sync(&remote.config, remote.pool.clone(), ls, ms))
             });
         }).unwrap();
 }
@@ -110,6 +113,7 @@ async fn run_metric_sync(
         if let Err(e) = run_metric_sync_inner(config, client.get(), &ms).await {
             error!("{} error: {}", log_ctx, e);
             pool.discard_faulted(client).await;
+            set_metric_sync_metric(OkErr::Err, config, &ms);
             tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
             continue 'retry_all;
         }
@@ -143,7 +147,8 @@ async fn run_metric_sync_inner(
                 trace!("{} got key=`{}'", log_ctx, metric.key.display_name());
                 if let Some(latest) = metric.latest {
                     ms.lock().unwrap()
-                        .update(&metric.key, latest.clone())
+                      .update(&metric.key, latest.clone());
+                    set_metric_sync_metric(OkErr::Ok, config, ms);
                 }
             },
         };
@@ -154,7 +159,8 @@ async fn run_metric_sync_inner(
 async fn run_log_sync(
     config: &config::RemoteSync,
     pool: Arc<collector_pool::Pool>,
-    ls: Arc<Mutex<LogStore>>
+    ls: Arc<Mutex<LogStore>>,
+    ms: Arc<Mutex<MetricStore>>,
 ) {
     let log_ctx = format!("log-sync {}", &config.url);
     'retry_all: loop {
@@ -166,9 +172,10 @@ async fn run_log_sync(
             },
             Ok(c) => c,
         };
-        if let Err(e) = run_log_sync_inner(config, client.get(), &ls).await {
+        if let Err(e) = run_log_sync_inner(config, client.get(), &ls, &ms).await {
             error!("{} error: {}", log_ctx, e);
             pool.discard_faulted(client).await;
+            set_log_sync_metric(OkErr::Err, config, &ms);
             tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
             continue 'retry_all;
         }
@@ -180,7 +187,8 @@ async fn run_log_sync(
 async fn run_log_sync_inner(
     config: &config::RemoteSync,
     client: &mut collector_pool::Client,
-    ls: &Arc<Mutex<LogStore>>
+    ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>,
 ) -> Result<(), String> {
     let log_ctx = format!("log-sync {}", &config.url);
     let req = collector::StreamLogsRequest {};
@@ -201,10 +209,29 @@ async fn run_log_sync_inner(
                 };
                 trace!("{} got a log key=`{}'", log_ctx, log.key.display_name());
                 ls.lock().unwrap().update(log);
+                set_log_sync_metric(OkErr::Ok, config, ms);
             },
         };
     }
     // Unreachable, because we never break out of the 'next_message loop.
+}
+
+fn set_metric_sync_metric(ok: OkErr, config: &config::RemoteSync, ms: &Arc<Mutex<MetricStore>>) {
+    ms.lock().unwrap()
+      .update(&config.metrics_sync_key(),
+              DataPoint {
+                  time: chrono::Utc::now(),
+                  val: MetricValue::OkErr(ok),
+              });
+}
+
+fn set_log_sync_metric(ok: OkErr, config: &config::RemoteSync, ms: &Arc<Mutex<MetricStore>>) {
+    ms.lock().unwrap()
+      .update(&config.logs_sync_key(),
+              DataPoint {
+                  time: chrono::Utc::now(),
+                  val: MetricValue::OkErr(ok),
+              });
 }
 
 pub fn force_check_remote(mk: &MetricKey, remotes: &Arc<Remotes>) {

@@ -117,3 +117,19 @@ impl RemoteCheck {
         }
     }
 }
+
+impl RemoteSync {
+    pub fn metrics_sync_key(&self) -> MetricKey {
+        MetricKey {
+            name: format!("sync.{}.metrics", self.url),
+            host: Host::Local,
+        }
+    }
+
+    pub fn logs_sync_key(&self) -> MetricKey {
+        MetricKey {
+            name: format!("sync.{}.logs", self.url),
+            host: Host::Local,
+        }
+    }
+}
