@@ -224,6 +224,8 @@ fn build_ui(
         .title("monitor")
         .border_width(8)
         .window_position(gtk::WindowPosition::Center)
+        .default_height(900)
+        .default_width(500)
         .build();
 
     // Load icon relative to Cargo provided package root or if that's
@@ -240,10 +242,14 @@ fn build_ui(
     window.show();
     let gdk_window = window.get_window().unwrap();
 
+    let scrollable = gtk::ScrolledWindowBuilder::new()
+        .parent(&window)
+        .build();
+
     let metrics_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Vertical)
-        .spacing(8)
-        .parent(&window)
+        .spacing(4)
+        .parent(&scrollable)
         .build();
 
     let mut metrics = BTreeMap::<MetricKey, MetricUi>::new();

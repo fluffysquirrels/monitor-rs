@@ -30,7 +30,6 @@
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
 * View just failing checks.
-* Scroll through list of checks when they get too long.
 * Web or Android front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture libs:
   [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
