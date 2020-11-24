@@ -37,6 +37,15 @@ pub enum OkErr {
     Err,
 }
 
+impl<T, E> From<Result<T, E>> for OkErr {
+    fn from(res: Result<T, E>) -> OkErr {
+        match res {
+            Ok(_) => OkErr::Ok,
+            Err(_) => OkErr::Err,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct MetricKey {
     pub name: String,

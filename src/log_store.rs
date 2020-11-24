@@ -32,6 +32,7 @@ impl LogStore {
     }
 
     pub fn update(&mut self, log: Log) {
+        trace!("update key='{}'", log.key.display_name());
         self.logs.insert(log.key.clone(), log.clone());
         self.update_signal.raise(log);
     }

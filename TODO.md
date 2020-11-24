@@ -11,8 +11,6 @@
 ## Features
 
 * Remote check syncing over gRPC
-    * Show status of syncing in checks
-        * Show error in log.
     * Migrate more mf jobs to collector
     * Notify on all synced metrics.
         * Including I64 metrics.
