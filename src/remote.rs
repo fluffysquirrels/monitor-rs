@@ -48,7 +48,7 @@ pub struct Remote {
 impl Remote {
     pub fn from_config(config: config::RemoteSync) -> Result<Remote, BoxError> {
         let endpoint = sync_endpoint(&config)?;
-        let pool = Arc::new(collector_pool::Pool::new(endpoint));
+        let pool = Arc::new(collector_pool::Pool::new(&config.url, endpoint));
         Ok(Remote {
             config,
             pool,
@@ -99,7 +99,6 @@ async fn run_metric_sync(
 ) {
     let log_ctx = format!("metric-sync {}", &config.url);
     'retry_all: loop {
-        debug!("{} connecting", log_ctx);
         let mut client = match pool.get().await {
             Err(e) => {
                 error!("{} connect error: {}", log_ctx, e);
@@ -108,48 +107,48 @@ async fn run_metric_sync(
             },
             Ok(c) => c,
         };
-        debug!("{}: connected", log_ctx);
-        let req = collector::StreamMetricsRequest {};
-        let mut stream = match client.get().stream_metrics(req).await {
-            Err(e) => {
-                error!("{} stream_metrics error: {}", log_ctx, e);
-                pool.discard_faulted(client).await;
-                tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                continue 'retry_all;
-            },
-            Ok(s) => s.into_inner(),
-        };
-        'next_message: loop {
-            match stream.message().await {
-                Err(e) => {
-                    error!("{} message() error: {}", log_ctx, e);
-                    pool.discard_faulted(client).await;
-                    tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                    continue 'retry_all;
-                }
-                Ok(None) => {
-                    error!("{} message() was None, stream should be infinte", log_ctx);
-                    pool.discard_faulted(client).await;
-                    tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                    continue 'retry_all;
-                }
-                Ok(Some(metric)) => {
-                    let metric = match crate::metric_store::Metric::from_protobuf(&metric) {
-                        Err(e) => {
-                            error!("{} error converting protobuf: {}", log_ctx, e);
-                            continue 'next_message;
-                        }
-                        Ok(m) => m,
-                    };
-                    trace!("{} got a metric key=`{}'", log_ctx, metric.key.display_name());
-                    if let Some(latest) = metric.latest {
-                        ms.lock().unwrap()
-                            .update(&metric.key, latest.clone())
-                    }
-                },
-            };
+        if let Err(e) = run_metric_sync_inner(config, client.get(), &ms).await {
+            error!("{} error: {}", log_ctx, e);
+            pool.discard_faulted(client).await;
+            tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+            continue 'retry_all;
         }
+        // Unreachable, because run_metric_sync_inner only returns on error.
     }
+    // Unreachable, because we never exit the 'retry_all loop.
+}
+
+async fn run_metric_sync_inner(
+    config: &config::RemoteSync,
+    client: &mut collector_pool::Client,
+    ms: &Arc<Mutex<MetricStore>>
+) -> Result<(), String> {
+    let log_ctx = format!("metric-sync {}", &config.url);
+    let req = collector::StreamMetricsRequest {};
+    let mut stream = client.stream_metrics(req).await
+                           .map_err(|e| format!("stream_metrics: {}", e))?
+                           .into_inner();
+    'next_message: loop {
+        match stream.message().await {
+            Err(e) => return Err(format!("message(): {}", e)),
+            Ok(None) => return Err("message() was None, stream should be infinite".to_owned()),
+            Ok(Some(metric)) => {
+                let metric = match crate::metric_store::Metric::from_protobuf(&metric) {
+                    Err(e) => {
+                        error!("{} error converting protobuf: {}", log_ctx, e);
+                        continue 'next_message;
+                    }
+                    Ok(m) => m,
+                };
+                trace!("{} got key=`{}'", log_ctx, metric.key.display_name());
+                if let Some(latest) = metric.latest {
+                    ms.lock().unwrap()
+                        .update(&metric.key, latest.clone())
+                }
+            },
+        };
+    }
+    // Unreachable, because we never break out of the 'next_message loop.
 }
 
 async fn run_log_sync(
@@ -159,7 +158,6 @@ async fn run_log_sync(
 ) {
     let log_ctx = format!("log-sync {}", &config.url);
     'retry_all: loop {
-        debug!("{} connecting", log_ctx);
         let mut client = match pool.get().await {
             Err(e) => {
                 error!("{} connect error: {}", log_ctx, e);
@@ -168,45 +166,45 @@ async fn run_log_sync(
             },
             Ok(c) => c,
         };
-        debug!("{} connected", log_ctx);
-        let req = collector::StreamLogsRequest {};
-        let mut stream = match client.get().stream_logs(req).await {
-            Err(e) => {
-                error!("{} stream_logs error: {}", log_ctx, e);
-                pool.discard_faulted(client).await;
-                tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                continue 'retry_all;
-            },
-            Ok(s) => s.into_inner(),
-        };
-        'next_message: loop {
-            match stream.message().await {
-                Err(e) => {
-                    error!("{} message() error: {}", log_ctx, e);
-                    pool.discard_faulted(client).await;
-                    tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                    continue 'retry_all;
-                }
-                Ok(None) => {
-                    error!("{} message() was None, stream should be infinte", log_ctx);
-                    pool.discard_faulted(client).await;
-                    tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
-                    continue 'retry_all;
-                }
-                Ok(Some(log)) => {
-                    let log = match crate::log_store::Log::from_protobuf(&log) {
-                        Err(e) => {
-                            error!("{} error converting protobuf: {}", log_ctx, e);
-                            continue 'next_message;
-                        }
-                        Ok(m) => m,
-                    };
-                    trace!("{} got a log key=`{}'", log_ctx, log.key.display_name());
-                    ls.lock().unwrap().update(log);
-                },
-            };
+        if let Err(e) = run_log_sync_inner(config, client.get(), &ls).await {
+            error!("{} error: {}", log_ctx, e);
+            pool.discard_faulted(client).await;
+            tokio::time::delay_for(tokio::time::Duration::from_secs(5)).await;
+            continue 'retry_all;
         }
+        // Unreachable, because run_log_sync_inner only returns on error.
     }
+    // Unreachable, because we never exit the 'retry_all loop.
+}
+
+async fn run_log_sync_inner(
+    config: &config::RemoteSync,
+    client: &mut collector_pool::Client,
+    ls: &Arc<Mutex<LogStore>>
+) -> Result<(), String> {
+    let log_ctx = format!("log-sync {}", &config.url);
+    let req = collector::StreamLogsRequest {};
+    let mut stream = client.stream_logs(req).await
+                           .map_err(|e| format!("stream_logs error: {}", e))?
+                           .into_inner();
+    'next_message: loop {
+        match stream.message().await {
+            Err(e) => return Err(format!("message(): {}", e)),
+            Ok(None) => return Err("message() was None, stream should be infinite".to_owned()),
+            Ok(Some(log)) => {
+                let log = match crate::log_store::Log::from_protobuf(&log) {
+                    Err(e) => {
+                        error!("{} error converting protobuf: {}", log_ctx, e);
+                        continue 'next_message;
+                    }
+                    Ok(m) => m,
+                };
+                trace!("{} got a log key=`{}'", log_ctx, log.key.display_name());
+                ls.lock().unwrap().update(log);
+            },
+        };
+    }
+    // Unreachable, because we never break out of the 'next_message loop.
 }
 
 pub fn force_check_remote(mk: &MetricKey, remotes: &Arc<Remotes>) {

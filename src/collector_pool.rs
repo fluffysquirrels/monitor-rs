@@ -9,6 +9,7 @@ pub type Client = CollectorClient<tonic::transport::Channel>;
 pub struct Pool {
     state: Mutex<State>,
     endpoint: tonic::transport::Endpoint,
+    url: String,
 }
 
 struct State {
@@ -22,20 +23,21 @@ pub struct PoolClient {
 }
 
 impl Pool {
-    pub fn new(endpoint: tonic::transport::Endpoint) -> Pool {
+    pub fn new(url: &str, endpoint: tonic::transport::Endpoint) -> Pool {
         Pool {
             state: Mutex::new(State {
                 conn: None,
                 token: 0,
             }),
             endpoint,
+            url: url.to_owned(),
         }
     }
 
     pub async fn get(&self) -> Result<PoolClient, BoxError> {
         let mut lock_state = self.state.lock().await;
         if let Some(c) = &lock_state.conn {
-            trace!("Re-using pool connection");
+            debug!("{} Re-using pool connection", self.url);
             return Ok(PoolClient {
                 conn: c.clone(),
                 token: lock_state.token,
@@ -43,8 +45,16 @@ impl Pool {
         }
 
         // No current connection, make one.
-        trace!("Starting new pool connection");
-        let c = Client::connect(self.endpoint.clone()).await?;
+        debug!("{} Starting new pool connection", self.url);
+        let c = match Client::connect(self.endpoint.clone()).await {
+            Err(e) => {
+                error!("{} connect error: {}", self.url, e);
+                return Err(e.into());
+            },
+            Ok(c) => c,
+        };
+        debug!("{} Connected", self.url);
+
         lock_state.conn = Some(c.clone());
         Ok(PoolClient {
             conn: c,
@@ -55,12 +65,12 @@ impl Pool {
     /// Return a PoolClient that has faulted (returned an error).
     /// The underlying connection will not be returned by `get` again.
     pub async fn discard_faulted(&self, client: PoolClient) {
-        trace!("Discarding faulted connection");
+        debug!("{} Discarding faulted connection", self.url);
         let mut lock_state = self.state.lock().await;
 
         // If the current connection failed (as determined by token)
         if client.token == lock_state.token {
-            trace!("First time discarding this faulted connection");
+            debug!("{} First time discarding this faulted connection", self.url);
             // Start a new connection and update token so we don't discard the new one.
             lock_state.token = lock_state.token.overflowing_add(1).0;
             lock_state.conn = None;
