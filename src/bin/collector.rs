@@ -7,7 +7,7 @@ use monitor::{
     config,
     Continue,
     create_shell_checks,
-    // create_shell_metrics,
+    create_shell_metrics,
     Host,
     log_store::{self, LogStore},
     MetricKey,
@@ -32,6 +32,7 @@ async fn main() {
     let sched = Arc::new(Mutex::new(Scheduler::new()));
 
     create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
+    create_shell_metrics(&config.shell_metrics, &ls, &ms, None, &sched);
 
     sched.lock().unwrap().spawn();
 

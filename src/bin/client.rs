@@ -88,18 +88,18 @@ fn shell_metric_configs() -> Vec<ShellMetric> {
             interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
-        ShellMetric {
-            cmd: "ssh mf df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
-            name: "df.mf.root".to_owned(),
-            interval: config::Duration::Minutes(5),
-            check: MetricCheck::Max(80),
-        },
-        ShellMetric {
-            cmd: "ssh mf df -h /mnt/monster | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
-            name: "df.mf.monster".to_owned(),
-            interval: config::Duration::Minutes(5),
-            check: MetricCheck::Max(80),
-        },
+        // ShellMetric {
+        //     cmd: "ssh mf df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
+        //     name: "df.mf.root".to_owned(),
+        //     interval: config::Duration::Minutes(5),
+        //     check: MetricCheck::Max(80),
+        // },
+        // ShellMetric {
+        //     cmd: "ssh mf df -h /mnt/monster | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
+        //     name: "df.mf.monster".to_owned(),
+        //     interval: config::Duration::Minutes(5),
+        //     check: MetricCheck::Max(80),
+        // },
     ]
 }
 
@@ -146,6 +146,14 @@ fn config() -> config::Client {
         ],
         remote_checks: vec![
             config::RemoteCheck {
+                name: "df.mf.monster".to_owned(),
+                host_name: "mf".to_owned(),
+            },
+            config::RemoteCheck {
+                name: "df.mf.root".to_owned(),
+                host_name: "mf".to_owned(),
+            },
+            config::RemoteCheck {
                 name: "travis.github.fluffysquirrels/framed-rs.master.passed".to_owned(),
                 host_name: "f1".to_owned(),
             },
@@ -183,14 +191,13 @@ fn main() {
            rudano::to_string_pretty(&config).expect("rudano serialisation"));
 
     create_shell_checks(&config.shell_checks, &ls, &ms, &sched);
-    create_shell_metrics(&config.shell_metrics, &ls, &ms, &n, &sched);
+    create_shell_metrics(&config.shell_metrics, &ls, &ms, Some(&n), &sched);
 
     connect_all_checks_to_notifier(&ms, &n);
 
     let remotes = remote::Remotes::from_configs(&config.remote_syncs)
                                   .expect("RemoteSync configs OK");
     let remotes = Arc::new(remotes);
-
 
     let application =
         gtk::Application::new(Some("com.github.fluffysquirrels.monitor"),

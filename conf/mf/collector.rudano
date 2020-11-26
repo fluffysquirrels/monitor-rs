@@ -7,7 +7,20 @@ Collector {
             interval: Seconds(5),
         }
     ],
-    shell_metrics: [],
+    shell_metrics: [
+        ShellMetric {
+            name: "df.mf.root",
+            cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'",
+            interval: Minutes(5),
+            check: Max(80),
+        },
+        ShellMetric {
+            name: "df.mf.monster",
+            cmd: "df -h /mnt/monster | awk '{print $5}' | egrep -o '[0-9]+'",
+            interval: Minutes(5),
+            check: Max(80),
+        },
+    ],
 
     server_tls_identity: Some(TlsIdentity {
         cert_path: "/usr/local/lib/monitor/cert/mf.fullchain",

@@ -214,7 +214,7 @@ pub fn create_shell_metrics(
     metric_configs: &[config::ShellMetric],
     ls: &Arc<Mutex<LogStore>>,
     ms: &Arc<Mutex<MetricStore>>,
-    n: &Arc<Mutex<Notifier>>,
+    n: Option<&Arc<Mutex<Notifier>>>,
     sched: &Arc<Mutex<Scheduler>>)
 {
     for smc in metric_configs.iter() {
@@ -222,7 +222,9 @@ pub fn create_shell_metrics(
                              ls.clone(),
                              ms.clone(),
                              sched.clone());
-        connect_metric_to_notifier(&smc, &ms, &n);
+        if let Some(n) = n {
+            connect_metric_to_notifier(&smc, &ms, &n);
+        }
     }
 }
 
