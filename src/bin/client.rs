@@ -358,14 +358,16 @@ fn build_ui(
                     };
                     ui_metric.label_status.set_markup(
                         &format!("<span fgcolor='{}'>{}</span>", fgcolor,
-                                 match dp.ok {
-                                     OkErr::Err => "Err".to_owned(),
-                                     OkErr::Ok => match dp.val {
-                                         MetricValue::None => "Ok".to_owned(),
-                                         MetricValue::I64(x) => x.to_string(),
-                                         MetricValue::F64(x) => x.to_string(),
+                                 match dp.val {
+                                     MetricValue::None => match dp.ok {
+                                         OkErr::Ok => "Ok".to_owned(),
+                                         OkErr::Err => "Err".to_owned(),
                                      },
-                                 }));
+                                     MetricValue::I64(x) => x.to_string(),
+                                     MetricValue::F64(x) => x.to_string(),
+                                 },));
+                } else {
+                    warn!("Couldn't find ui_metric for key '{}'", &metric.key.display_name());
                 }
             }
             glib::source::Continue(true)
