@@ -189,10 +189,8 @@ fn main() {
 
     let remotes = remote::Remotes::from_configs(&config.remote_syncs)
                                   .expect("RemoteSync configs OK");
-    remote::spawn_sync_jobs(&remotes, &ls, &ms);
     let remotes = Arc::new(remotes);
 
-    sched.lock().unwrap().spawn();
 
     let application =
         gtk::Application::new(Some("com.github.fluffysquirrels.monitor"),
@@ -205,7 +203,10 @@ fn main() {
         let ls = ls.clone();
         let config = config.clone();
         let remotes = remotes.clone();
-        build_ui(&config, app, ls, ms, remotes, sc);
+        build_ui(&config, app, ls.clone(), ms.clone(), remotes.clone(), sc);
+
+        remote::spawn_sync_jobs(&remotes, &ls, &ms);
+        sched.lock().unwrap().spawn();
     });
 
     application.run(&std::env::args().collect::<Vec<_>>());
