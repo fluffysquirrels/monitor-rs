@@ -10,14 +10,6 @@
 
 ## Features
 
-* Remote check syncing over gRPC
-    * Migrate more mf jobs to collector
-        * Including I64 metrics.
-    * Notify on all synced metrics.
-        * Including I64 metrics.
-    * What happens when the collector or client is overloaded? How would we shed load?
-        * Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
-          and `try_send` will fail. Could test this by not reading from the client side.
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC
@@ -74,6 +66,10 @@
 * Load testing.
   [ghz](https://github.com/bojand/ghz) was good for request-response
   rpc's, didn't seem to work for streaming
+* Remote check syncing over gRPC
+    * What happens when the collector or client is overloaded? How would we shed load?
+        * Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
+          and `try_send` will fail. Could test this by not reading from the client side.
 
 ## Questions
 
