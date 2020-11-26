@@ -106,19 +106,25 @@ impl Metric {
         let rv = Metric {
             latest: match &metric.latest {
                 None => None,
-                Some(dp) => Some(DataPoint {
-                    time: chrono_datetime_from_protobuf(
-                              dp.time.as_ref()
-                                     .ok_or_else(|| "protobuf DataPoint missing .time"
-                                                    .to_owned())?)?,
-                    val: match dp.value.as_ref()
-                                 .ok_or_else(|| "protobuf DataPoint missing .value".to_owned())? {
-                        collector::data_point::Value::Ok(true) => MetricValue::OkErr(OkErr::Ok),
-                        collector::data_point::Value::Ok(false) => MetricValue::OkErr(OkErr::Err),
-                        collector::data_point::Value::I64(x) => MetricValue::I64(*x),
-                        collector::data_point::Value::F64(x) => MetricValue::F64(*x),
-                    },
-                }),
+                Some(dp) => {
+                    let val = dp.value.as_ref()
+                                .ok_or_else(|| "protobuf DataPoint missing .value".to_owned())?;
+                    Some(DataPoint {
+                        time: chrono_datetime_from_protobuf(
+                            dp.time.as_ref()
+                                .ok_or_else(|| "protobuf DataPoint missing .time"
+                                            .to_owned())?)?,
+                        val: match val {
+                            collector::data_point::Value::None(_) => MetricValue::None,
+                            collector::data_point::Value::I64(x)  => MetricValue::I64(*x),
+                            collector::data_point::Value::F64(x)  => MetricValue::F64(*x),
+                        },
+                        ok: match dp.ok {
+                            true => OkErr::Ok,
+                            false => OkErr::Err,
+                        }
+                    })
+                },
             },
             key: MetricKey::from_protobuf(
                      metric.key.as_ref()
@@ -135,16 +141,16 @@ impl Metric {
                 None => None,
                 Some(dp) => Some(collector::DataPoint {
                     time: Some(chrono_datetime_to_protobuf(&dp.time)?),
-                    value: Some(match dp.val {
-                        MetricValue::OkErr(OkErr::Ok) =>
-                            collector::data_point::Value::Ok(true),
-                        MetricValue::OkErr(OkErr::Err) =>
-                            collector::data_point::Value::Ok(false),
-                        MetricValue::I64(x) =>
-                            collector::data_point::Value::I64(x),
-                        MetricValue::F64(x) =>
-                            collector::data_point::Value::F64(x),
+                    value: Some(match &dp.val {
+                        MetricValue::None =>
+                            collector::data_point::Value::None(collector::None {}),
+                        MetricValue::I64(x) => collector::data_point::Value::I64(*x),
+                        MetricValue::F64(x) => collector::data_point::Value::F64(*x),
                     }),
+                    ok: match &dp.ok {
+                        OkErr::Ok => true,
+                        OkErr::Err => false,
+                    },
                 }),
             },
         })

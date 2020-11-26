@@ -340,17 +340,23 @@ fn build_ui(
         });
 
         rx.attach(Some(&ui_thread), move |metric| {
-            if let Some(DataPoint { val, .. }) = &metric.latest {
+            if let Some(dp) = &metric.latest {
                 let ui_metric = ui.metrics.get(&metric.key);
                 if let Some(ui_metric) = ui_metric {
-                    if let MetricValue::OkErr(ok) = val {
-                        ui_metric.label_status.set_markup(match ok {
-                            OkErr::Ok  => "<span fgcolor='#00cc00'>Ok</span>",
-                            OkErr::Err => "<span fgcolor='#cc0000'>Err</span>",
-                        });
-                    } else {
-                        ui_metric.label_status.set_text(&format!("{}", val));
-                    }
+                    let fgcolor = match dp.ok {
+                        OkErr::Ok => "#00cc00",
+                        OkErr::Err => "#cc0000",
+                    };
+                    ui_metric.label_status.set_markup(
+                        &format!("<span fgcolor='{}'>{}</span>", fgcolor,
+                                 match dp.ok {
+                                     OkErr::Err => "Err".to_owned(),
+                                     OkErr::Ok => match dp.val {
+                                         MetricValue::None => "Ok".to_owned(),
+                                         MetricValue::I64(x) => x.to_string(),
+                                         MetricValue::F64(x) => x.to_string(),
+                                     },
+                                 }));
                 }
             }
             glib::source::Continue(true)
@@ -477,18 +483,18 @@ impl rt_graph::DataSource for MetricStoreDataSource {
             Some(m) => {
                 let dp = m.latest.as_ref();
                 match dp {
-                    Some(DataPoint { val, time }) => {
+                    Some(DataPoint { ok, val, time }) => {
                         if self.last.is_none() ||
                             (self.last.is_some() && *time != self.last.as_ref().unwrap().time) {
                             self.t += 1;
                             self.last = Some(dp.unwrap().clone());
                             vec![rt_graph::Point {
                                 t: self.t, // TODO: Use time.
-                                vs: vec![match val {
-                                    MetricValue::OkErr(OkErr::Ok)  => 50000,
-                                    MetricValue::OkErr(OkErr::Err) => 10000,
-                                    MetricValue::I64(i) => *i as u16, // TODO: Handle overflow
-                                    MetricValue::F64(_f) => unimplemented!(),
+                                vs: vec![match (ok, val) {
+                                    (OkErr::Err, _) => 10000,
+                                    (_, MetricValue::None) => 50000,
+                                    (_, MetricValue::I64(i)) => *i as u16, // TODO: Handle overflow
+                                    (_, MetricValue::F64(_f)) => todo!(),
                                 },
                             ]}]
                         } else {

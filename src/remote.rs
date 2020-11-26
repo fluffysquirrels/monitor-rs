@@ -232,7 +232,8 @@ fn set_sync_metric_log(
       .update(key,
               DataPoint {
                   time: chrono::Utc::now(),
-                  val: MetricValue::OkErr(OkErr::from(res.as_ref())),
+                  val: MetricValue::None,
+                  ok: OkErr::from(res.as_ref()),
               });
     ls.lock().unwrap()
       .update(Log {

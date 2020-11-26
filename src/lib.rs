@@ -112,7 +112,7 @@ impl MetricKey {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MetricValue {
-    OkErr(OkErr),
+    None,
     I64(i64),
     F64(f64),
 }
@@ -121,6 +121,7 @@ pub enum MetricValue {
 pub struct DataPoint {
     pub time: chrono::DateTime<chrono::Utc>,
     pub val: MetricValue,
+    pub ok: OkErr,
 }
 
 #[derive(Clone, Debug)]
@@ -184,17 +185,6 @@ pub fn run_shell(mut cmd: std::process::Command) -> Result<RunShellResult, std::
         finish_time: finish_utc,
     };
     Ok(res)
-}
-
-impl std::fmt::Display for MetricValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match self {
-            MetricValue::OkErr(OkErr::Ok) => f.write_str("Ok"),
-            MetricValue::OkErr(OkErr::Err) => f.write_str("Err"),
-            MetricValue::I64(int) => f.write_str(&format!("{}", int)),
-            MetricValue::F64(float) => f.write_str(&format!("{}", float)),
-        }
-    }
 }
 
 impl MetricValue {
@@ -267,7 +257,8 @@ pub fn add_shell_check_job(
                     debug!("run_shell cmd=`{}' log=\n{}", &cmd, res.log);
                     ms.lock().unwrap().update(&key, DataPoint {
                         time: chrono::Utc::now(),
-                        val: MetricValue::OkErr(res.ok)
+                        val: MetricValue::None,
+                        ok: res.ok,
                     });
                     ls.lock().unwrap().update(Log {
                         start: res.start_time,
@@ -281,7 +272,8 @@ pub fn add_shell_check_job(
                     error!("run_shell cmd=`{}' error={}", &cmd, e);
                     ms.lock().unwrap().update(&key, DataPoint {
                         time: chrono::Utc::now(),
-                        val: MetricValue::OkErr(OkErr::Err),
+                        val: MetricValue::None,
+                        ok: OkErr::Err,
                     });
                     ls.lock().unwrap().update(Log {
                         start, finish,
@@ -308,6 +300,7 @@ pub fn add_shell_metric_job(
 ) {
     let cmd = config.cmd.to_owned();
     let name = config.name.to_owned();
+    let check = config.check.clone();
     let j = scheduler::JobDefinition {
         interval: config.interval.as_chrono_duration(),
         name: String::from(&name),
@@ -332,10 +325,17 @@ pub fn add_shell_metric_job(
                         Ok(i) =>
                             ms.lock().unwrap().update(&key, DataPoint {
                                 time: chrono::Utc::now(),
-                                val: MetricValue::I64(i)
+                                val: MetricValue::I64(i),
+                                ok: check.is_value_ok(i),
                             }),
-                        Err(e) =>
-                            error!("Error parsing run_shell stdout: {}", e),
+                        Err(e) => {
+                            error!("Error parsing run_shell stdout: {}", e);
+                            ms.lock().unwrap().update(&key, DataPoint {
+                                time: chrono::Utc::now(),
+                                val: MetricValue::None,
+                                ok: OkErr::Err,
+                            });
+                        }
                     };
                     ls.lock().unwrap().update(Log {
                         start: res.start_time,
@@ -379,12 +379,19 @@ pub fn connect_metric_to_notifier(
                     host: Host::Local,
                 })
                 .connect(move |m| {
-                    let val: i64 = m.latest.as_ref().unwrap()
-                        .val.as_i64().expect("Only int checks so far");
-                    let ok = check.is_value_ok(val);
-                    debug!("Metric check name=`{}' value={} check={:?} ok={:?}",
-                           m.key.display_name(), val, check, ok);
-                    nc.lock().unwrap().update_metric(&m.key.display_name(), ok);
+                    let dp = m.latest.as_ref().unwrap();
+                    match dp.ok {
+                        OkErr::Err =>
+                            nc.lock().unwrap().update_metric(&m.key.display_name(), OkErr::Err),
+                        OkErr::Ok => {
+                            let val: i64 = m.latest.as_ref().unwrap()
+                                .val.as_i64().expect("Only int checks so far");
+                            let ok = check.is_value_ok(val);
+                            debug!("Metric check name=`{}' value={:?} check={:?} ok={:?}",
+                                   m.key.display_name(), val, check, ok);
+                            nc.lock().unwrap().update_metric(&m.key.display_name(), ok);
+                        },
+                    }
                     Continue::Continue
                 });
         },
@@ -400,7 +407,7 @@ pub fn connect_all_checks_to_notifier(
         .update_signal_for_all()
         .connect(move |m|
                  {
-                     if let Some(DataPoint { val: MetricValue::OkErr(ok),.. })
+                     if let Some(DataPoint { ok, .. })
                              = m.latest.as_ref() {
                          nc.lock().unwrap().update_metric(&m.key.display_name(), *ok);
                      }

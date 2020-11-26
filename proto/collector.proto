@@ -33,12 +33,15 @@ message Metric {
 }
 
 message DataPoint {
+  reserved 2;
+
   Time time = 1;
   oneof value {
-    bool ok = 2;
     int64 i64 = 3;
     double f64 = 4;
+    None none = 6;
   }
+  bool ok = 5;
 }
 
 message Log {
@@ -67,3 +70,5 @@ message Duration {
   fixed64 secs = 1;
   fixed32 nanos = 2;
 }
+
+message None {}
