@@ -134,12 +134,15 @@ impl collector_server::Collector for CollectorService {
                           .iter().map(|m| metric_to_remote(m, &self.config))
                           .collect::<Result<Vec<collector::Metric>, String>>();
         if let Err(e) = metrics {
-            error!("metrics to_protobuf error: {}", e);
+            error!("metrics metric_to_remote error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
         }
         let metrics = metrics.unwrap();
-        let (mut tx, rx) = tokio::sync::mpsc::channel(metrics.len() + 10);
+        let (mut tx, rx) =
+            tokio::sync::mpsc::channel::<Result<collector::Metric, tonic::Status>>(
+                metrics.len() + 10);
         for m in metrics.into_iter() {
+            trace!("stream_metrics: Sending initial value '{:?}'", &m);
             tx.try_send(Ok(m)).expect("channel to have capacity for all initial values");
         }
         trace!("CollectorService::stream_metrics sent initial values");

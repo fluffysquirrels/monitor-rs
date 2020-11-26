@@ -154,6 +154,8 @@ async fn run_metric_sync_inner(
                     ms.lock().unwrap()
                       .update(&metric.key, latest.clone());
                     set_sync_metric_log(Ok(()), &config.metrics_sync_key(), &ls, &ms);
+                } else {
+                    warn!("{} metric.latest was null", log_ctx);
                 }
             },
         };

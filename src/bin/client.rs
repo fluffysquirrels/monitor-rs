@@ -348,6 +348,7 @@ fn build_ui(
         });
 
         rx.attach(Some(&ui_thread), move |metric| {
+            trace!("gui thread got metric = {:?}", &metric);
             if let Some(dp) = &metric.latest {
                 let ui_metric = ui.metrics.get(&metric.key);
                 if let Some(ui_metric) = ui_metric {
