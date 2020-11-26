@@ -12,14 +12,12 @@
 
 * Remote check syncing over gRPC
     * Migrate more mf jobs to collector
+        * Including I64 metrics.
     * Notify on all synced metrics.
         * Including I64 metrics.
-    * Show synced metrics in UI.
-        * Ideally zero lines of config in client for synced metrics (incl checks on metrics?)
     * What happens when the collector or client is overloaded? How would we shed load?
         * Hopefully the `tokio::mpsc` the streaming rpc uses will back up,
           and `try_send` will fail. Could test this by not reading from the client side.
-* Show i64 metric checks in green for Ok and passed I64 metric check or red otherwise.
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC
@@ -51,6 +49,7 @@
 
 ## Improvements
 
+* Ideally it would be zero lines of config to show a remote check in the UI.
 * The scheduler detects resume from suspend, it would be nice to restart
   the sync jobs at the same time.
 * Force run remote job should probably re-use an existing tokio runtime.
