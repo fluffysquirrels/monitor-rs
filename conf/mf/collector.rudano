@@ -9,6 +9,12 @@ Collector {
     ],
     shell_metrics: [
         ShellMetric {
+            name: "apt.mf.upgradable",
+            cmd: "/home/alex/Code/apt-upgradable.py",
+            interval: Minutes(10),
+            check: Max(0),
+        },
+        ShellMetric {
             name: "df.mf.root",
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'",
             interval: Minutes(5),

@@ -46,7 +46,6 @@
   the sync jobs at the same time.
 * Force run remote job should probably re-use an existing tokio runtime.
 * Force run remote job should probably retry a few times before failing.
-* apt.upgradable checks should be metrics to show the number of packages upgradable in the UI.
 * Remote sync config should be in an Arc, it's expensive and it's copied a few times.
 * Measure latency between a forced check request and its metric and log being published,
   including for remote checks.

@@ -55,16 +55,6 @@ fn shell_check_configs() -> Vec<ShellCheck> {
             interval: config::Duration::Seconds(60),
         },
         ShellCheck {
-            name: "apt.plato.upgradable".to_owned(),
-            cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
-            interval: config::Duration::Minutes(10),
-        },
-        ShellCheck {
-            name: "apt.mf.upgradable".to_owned(),
-            cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
-            interval: config::Duration::Minutes(10),
-        },
-        ShellCheck {
             name: "internet.up.gstatic".to_owned(),
             cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
             interval: config::Duration::Minutes(2),
@@ -88,6 +78,18 @@ fn shell_metric_configs() -> Vec<ShellMetric> {
             interval: config::Duration::Minutes(5),
             check: MetricCheck::Max(80),
         },
+        ShellMetric {
+            name: "apt.plato.upgradable".to_owned(),
+            cmd: "/home/alex/Code/rust/monitor/scripts/apt-upgradable.py".to_owned(),
+            interval: config::Duration::Minutes(10),
+            check: MetricCheck::Max(0),
+        },
+        // ShellMetric {
+        //     name: "apt.mf.upgradable".to_owned(),
+        //     cmd: "ssh mf /home/alex/Code/apt-upgradable.py".to_owned(),
+        //     interval: config::Duration::Minutes(10),
+        //     check: MetricCheck::Max(0),
+        // },
         // ShellMetric {
         //     cmd: "ssh mf df -h / | awk '{print $5}' | egrep -o '[0-9]+'".to_owned(),
         //     name: "df.mf.root".to_owned(),
@@ -145,6 +147,10 @@ fn config() -> config::Client {
             },
         ],
         remote_checks: vec![
+            config::RemoteCheck {
+                name: "apt.mf.upgradable".to_owned(),
+                host_name: "mf".to_owned(),
+            },
             config::RemoteCheck {
                 name: "df.mf.monster".to_owned(),
                 host_name: "mf".to_owned(),
