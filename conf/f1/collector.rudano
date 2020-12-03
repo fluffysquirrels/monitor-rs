@@ -17,7 +17,14 @@ Collector {
             interval: Minutes(30),
         },
     ],
-    shell_metrics: [],
+    shell_metrics: [
+        ShellMetric {
+            name: "df.f1.root",
+            cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'",
+            interval: Minutes(5),
+            check: Max(80),
+        },
+    ],
 
     server_tls_identity: Some(TlsIdentity {
         cert_path: "/usr/local/lib/monitor/cert/f1.fullchain",

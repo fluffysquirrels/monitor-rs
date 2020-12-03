@@ -152,6 +152,10 @@ fn config() -> config::Client {
                 host_name: "mf".to_owned(),
             },
             config::RemoteCheck {
+                name: "df.f1.root".to_owned(),
+                host_name: "f1".to_owned(),
+            },
+            config::RemoteCheck {
                 name: "df.mf.monster".to_owned(),
                 host_name: "mf".to_owned(),
             },
