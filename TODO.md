@@ -10,6 +10,8 @@
 
 ## Features
 
+* Add hyperlinks to show logs / status. E.g. Travis checks.
+* Add an apt check for f1.
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC
@@ -18,6 +20,7 @@
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
 * View just failing checks.
+* View checks filtered by containing a string.
 * Web or Android front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture libs:
   [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
