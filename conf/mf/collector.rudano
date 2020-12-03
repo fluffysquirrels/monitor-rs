@@ -5,7 +5,12 @@ Collector {
             name: "zfs.mf.healthy",
             cmd: "/sbin/zpool status -x | grep \'all pools are healthy\'",
             interval: Seconds(5),
-        }
+        },
+        ShellCheck {
+            name: "jellyfin.mf.http",
+            cmd: "curl 'http://[::1]:8096/' --head --fail --connect-timeout 5 --no-progress-meter",
+            interval: Seconds(30),
+        },
     ],
     shell_metrics: [
         ShellMetric {

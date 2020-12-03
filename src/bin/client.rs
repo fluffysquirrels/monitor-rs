@@ -160,6 +160,10 @@ fn config() -> config::Client {
                 host_name: "mf".to_owned(),
             },
             config::RemoteCheck {
+                name: "jellyfin.mf.http".to_owned(),
+                host_name: "mf".to_owned(),
+            },
+            config::RemoteCheck {
                 name: "travis.github.fluffysquirrels/framed-rs.master.passed".to_owned(),
                 host_name: "f1".to_owned(),
             },
