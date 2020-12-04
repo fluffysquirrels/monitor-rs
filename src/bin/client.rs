@@ -148,6 +148,10 @@ fn config() -> config::Client {
         ],
         remote_checks: vec![
             config::RemoteCheck {
+                name: "apt.f1.upgradable".to_owned(),
+                host_name: "f1".to_owned(),
+            },
+            config::RemoteCheck {
                 name: "apt.mf.upgradable".to_owned(),
                 host_name: "mf".to_owned(),
             },

@@ -11,7 +11,6 @@
 ## Features
 
 * Add hyperlinks to show logs / status. E.g. Travis checks.
-* Add an apt check for f1.
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC

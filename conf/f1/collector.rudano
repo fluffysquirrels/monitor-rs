@@ -19,6 +19,12 @@ Collector {
     ],
     shell_metrics: [
         ShellMetric {
+            name: "apt.f1.upgradable",
+            cmd: "/usr/local/lib/monitor/scripts/apt-upgradable.py",
+            interval: Minutes(10),
+            check: Max(0),
+        },
+        ShellMetric {
             name: "df.f1.root",
             cmd: "df -h / | awk '{print $5}' | egrep -o '[0-9]+'",
             interval: Minutes(5),
