@@ -10,7 +10,10 @@
 
 ## Features
 
-* Add hyperlinks to show logs / status. E.g. Travis checks.
+* Add summary row to UI with number of Ok/Err checks.
+* View just failing checks.
+* View checks filtered by containing a string.
+* Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
 * Push checks (e.g. webhooks for Travis)
     * Travis makes HTTPS request to a listening HTTPS server (outside firewall)
     * HTTPS Server turns that HTTPS request into a gRPC RPC or gRPC
@@ -18,15 +21,13 @@
     * `collector` server handler wakes up and pushes the metric into `MetricStore`.
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
-* View just failing checks.
-* View checks filtered by containing a string.
 * Web or Android front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture libs:
   [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
   [rsedis](https://github.com/seppo0010/rsedis) and
   [redis-rs](https://github.com/mitsuhiko/redis-rs) could be nice for real-time pubsub.
-* Keep a history of checks and logs in a DB. View old logs
+* Keep a history of checks and logs in a DB. View old logs in UI.
 * CI
     * Triggered by a webhook / rpc / force run for a manual check.
     * Stream job stdout log as job progresses
