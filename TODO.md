@@ -10,6 +10,7 @@
 
 ## Features
 
+* Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
 * Push checks (e.g. webhooks for Travis)
@@ -58,6 +59,7 @@
 * `MetricStoreDataSource` should use time for `Point.t`.
 * No visual feedback from using "Force" button. It should be disabled
   when you click it and enabled again when the job finishes.
+* Force button fails for sync checks, because they don't use the Scheduler.
 * No way to tell hovering over the check label will show you the log.
 * `Scheduler` could use a heap to calculate the next jobs in
   `O(log n)` time each, rather than iterating through all jobs frequently in
