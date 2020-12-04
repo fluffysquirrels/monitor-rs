@@ -33,6 +33,7 @@ use std::{
 struct Ui {
     metrics: BTreeMap<MetricKey, MetricUi>,
     summary_label: gtk::Label,
+    thread: glib::MainContext,
 }
 
 #[derive(Clone)]
@@ -340,9 +341,8 @@ fn build_ui(
     let ui = Rc::new(Ui {
         metrics,
         summary_label,
+        thread: glib::MainContext::ref_thread_default(),
     });
-
-    let ui_thread = glib::MainContext::ref_thread_default();
 
     {
         // Subscribe to log messages and send them over a channel to the UI thread,
@@ -358,7 +358,7 @@ fn build_ui(
         });
 
         let uic = ui.clone();
-        rx.attach(Some(&ui_thread), move |log| {
+        rx.attach(Some(&ui.thread), move |log| {
             let metric = uic.metrics.get(&log.key);
             if let Some(metric) = metric {
                 metric.label_status.set_tooltip_text(Some(&log.log));
@@ -367,46 +367,7 @@ fn build_ui(
         });
     }
 
-    {
-        // Subscribe to metric updates and send them over a channel to the UI thread,
-        // which can then update the UI with metric status.
-
-        let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
-
-        ms.lock().unwrap().update_signal_for_all().connect(move |metric| {
-            if tx.send(metric).is_err() {
-                error!("MetricStore UI channel send error");
-            }
-            Continue::Continue
-        });
-
-        rx.attach(Some(&ui_thread), move |metric| {
-            trace!("gui thread got metric = {:?}", &metric);
-            if let Some(dp) = &metric.latest {
-                let ui_metric = ui.metrics.get(&metric.key);
-                if let Some(ui_metric) = ui_metric {
-                    let fgcolor = match dp.ok {
-                        OkErr::Ok => OK_COLOR,
-                        OkErr::Err => ERR_COLOR,
-                    };
-                    ui_metric.label_status.set_markup(
-                        &format!("<span fgcolor='{}'>{}</span>", fgcolor,
-                                 match dp.val {
-                                     MetricValue::None => match dp.ok {
-                                         OkErr::Ok => "Ok".to_owned(),
-                                         OkErr::Err => "Err".to_owned(),
-                                     },
-                                     MetricValue::I64(x) => x.to_string(),
-                                     MetricValue::F64(x) => x.to_string(),
-                                 },));
-                } else {
-                    warn!("Couldn't find ui_metric for key '{}'", &metric.key.display_name());
-                }
-            }
-            update_summary_label(&ui, &ms);
-            glib::source::Continue(true)
-        });
-    }
+    connect_metric_updates(&ui, &ms);
 }
 
 fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
@@ -417,6 +378,49 @@ fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
                     "{} <span fgcolor='{}'>Err</span> check(s)"),
             counts.ok, OK_COLOR,
             counts.err, ERR_COLOR));
+}
+
+/// Subscribe to metric updates and send them over a channel to the UI thread,
+/// which can then update the UI with metric status.
+fn connect_metric_updates(ui: &Rc<Ui>, ms: &Arc<Mutex<MetricStore>>) {
+    let uic = ui.clone();
+    let msc = ms.clone();
+
+    let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
+
+    msc.lock().unwrap().update_signal_for_all().connect(move |metric| {
+        if tx.send(metric).is_err() {
+            error!("MetricStore UI channel send error");
+        }
+        Continue::Continue
+    });
+    let thread = uic.thread.clone();
+    rx.attach(Some(&thread), move |metric| {
+        trace!("gui thread got metric = {:?}", &metric);
+        if let Some(dp) = &metric.latest {
+            let ui_metric = uic.metrics.get(&metric.key);
+            if let Some(ui_metric) = ui_metric {
+                let fgcolor = match dp.ok {
+                    OkErr::Ok => OK_COLOR,
+                    OkErr::Err => ERR_COLOR,
+                };
+                ui_metric.label_status.set_markup(
+                    &format!("<span fgcolor='{}'>{}</span>", fgcolor,
+                             match dp.val {
+                                 MetricValue::None => match dp.ok {
+                                     OkErr::Ok => "Ok".to_owned(),
+                                     OkErr::Err => "Err".to_owned(),
+                                 },
+                                 MetricValue::I64(x) => x.to_string(),
+                                 MetricValue::F64(x) => x.to_string(),
+                             },));
+            } else {
+                warn!("Couldn't find ui_metric for key '{}'", &metric.key.display_name());
+            }
+        }
+        update_summary_label(&uic, &msc);
+        glib::source::Continue(true)
+    });
 }
 
 fn ui_for_metric<C>(
