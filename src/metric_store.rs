@@ -27,6 +27,11 @@ pub struct MetricStore {
     update_signal_for_all: Signal<Metric>,
 }
 
+pub struct CountOk {
+    pub ok: usize,
+    pub err: usize,
+}
+
 impl MetricStore {
     pub fn new() -> MetricStore {
         MetricStore {
@@ -70,6 +75,22 @@ impl MetricStore {
         self.metrics.values()
                     .map(|ms| ms.to_metric())
                     .collect::<Vec<Metric>>()
+    }
+
+    pub fn count_ok(&self) -> CountOk {
+        let mut counts = CountOk {
+            ok: 0,
+            err: 0,
+        };
+        for m in self.metrics.values() {
+            if let Some(DataPoint { ok, .. }) = m.latest {
+                match ok {
+                    OkErr::Ok => counts.ok += 1,
+                    OkErr::Err => counts.err += 1,
+                }
+            }
+        }
+        counts
     }
 
     fn get_or_insert_metric(&mut self, key: &MetricKey) -> &mut MetricState {

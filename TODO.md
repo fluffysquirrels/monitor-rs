@@ -10,7 +10,6 @@
 
 ## Features
 
-* Add summary row to UI with number of Ok/Err checks.
 * View just failing checks.
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin

@@ -32,6 +32,7 @@ use std::{
 #[derive(Clone)]
 struct Ui {
     metrics: BTreeMap<MetricKey, MetricUi>,
+    summary_label: gtk::Label,
 }
 
 #[derive(Clone)]
@@ -41,6 +42,9 @@ struct MetricUi {
     showing_graph: Rc<Cell<bool>>,
     show_graph_btn: gtk::Button,
 }
+
+const OK_COLOR: &'static str = "#00cc00";
+const ERR_COLOR: &'static str = "#cc0000";
 
 fn shell_check_configs() -> Vec<ShellCheck> {
     vec![
@@ -268,8 +272,18 @@ fn build_ui(
     window.show();
     let gdk_window = window.get_window().unwrap();
 
-    let scrollable = gtk::ScrolledWindowBuilder::new()
+    let window_box = gtk::BoxBuilder::new()
+        .orientation(gtk::Orientation::Vertical)
         .parent(&window)
+        .build();
+
+    let summary_label = gtk::LabelBuilder::new()
+        .parent(&window_box)
+        .build();
+
+    let scrollable = gtk::ScrolledWindowBuilder::new()
+        .parent(&window_box)
+        .vexpand(true)
         .build();
 
     let metrics_box = gtk::BoxBuilder::new()
@@ -323,9 +337,10 @@ fn build_ui(
         mui.graph.hide();
     }
 
-    let ui = Ui {
+    let ui = Rc::new(Ui {
         metrics,
-    };
+        summary_label,
+    });
 
     let ui_thread = glib::MainContext::ref_thread_default();
 
@@ -371,8 +386,8 @@ fn build_ui(
                 let ui_metric = ui.metrics.get(&metric.key);
                 if let Some(ui_metric) = ui_metric {
                     let fgcolor = match dp.ok {
-                        OkErr::Ok => "#00cc00",
-                        OkErr::Err => "#cc0000",
+                        OkErr::Ok => OK_COLOR,
+                        OkErr::Err => ERR_COLOR,
                     };
                     ui_metric.label_status.set_markup(
                         &format!("<span fgcolor='{}'>{}</span>", fgcolor,
@@ -388,9 +403,20 @@ fn build_ui(
                     warn!("Couldn't find ui_metric for key '{}'", &metric.key.display_name());
                 }
             }
+            update_summary_label(&ui, &ms);
             glib::source::Continue(true)
         });
     }
+}
+
+fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
+    let counts = ms.lock().unwrap().count_ok();
+    ui.summary_label.set_markup(
+        &format!(
+            concat!("{} <span fgcolor='{}'>Ok</span> and ",
+                    "{} <span fgcolor='{}'>Err</span> check(s)"),
+            counts.ok, OK_COLOR,
+            counts.err, ERR_COLOR));
 }
 
 fn ui_for_metric<C>(
