@@ -11,6 +11,7 @@ use monitor::{
     force_check,
     Host,
     LogStore,
+    metric_store,
     MetricCheck,
     MetricKey,
     MetricStore,
@@ -29,19 +30,25 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Clone)]
 struct Ui {
-    metrics: BTreeMap<MetricKey, MetricUi>,
+    metrics: BTreeMap<MetricKey, Rc<MetricUi>>,
     summary_label: gtk::Label,
     thread: glib::MainContext,
+    display_checks: Cell<DisplayChecks>,
 }
 
-#[derive(Clone)]
 struct MetricUi {
     label_status: gtk::Label,
-    graph: Rc<rt_graph::GraphWithControls>,
-    showing_graph: Rc<Cell<bool>>,
+    graph: rt_graph::GraphWithControls,
+    showing_graph: Cell<bool>,
     show_graph_btn: gtk::Button,
+    metric_box: gtk::Box,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum DisplayChecks {
+    All,
+    Err,
 }
 
 const OK_COLOR: &'static str = "#00cc00";
@@ -275,12 +282,31 @@ fn build_ui(
 
     let window_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
         .parent(&window)
         .build();
 
     let summary_label = gtk::LabelBuilder::new()
         .parent(&window_box)
         .build();
+
+    let top_controls = gtk::BoxBuilder::new()
+        .orientation(gtk::Orientation::Horizontal)
+        .parent(&window_box)
+        .build();
+
+    let all_checks = gtk::RadioButtonBuilder::new()
+        .label("All checks")
+        .active(true)
+        .parent(&top_controls)
+        .build();
+
+    let err_checks = gtk::RadioButtonBuilder::new()
+        .label("Err checks")
+        .active(false)
+        .parent(&top_controls)
+        .build();
+    err_checks.join_group(Some(&all_checks));
 
     let scrollable = gtk::ScrolledWindowBuilder::new()
         .parent(&window_box)
@@ -293,45 +319,7 @@ fn build_ui(
         .parent(&scrollable)
         .build();
 
-    let mut metrics = BTreeMap::<MetricKey, MetricUi>::new();
-
-    for config in config.shell_checks.iter() {
-        let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(
-            &metrics_box, &gdk_window, &key,
-            &ls, &ms, &remotes, &sched);
-        metrics.insert(key, metric_ui);
-    }
-
-    for config in config.shell_metrics.iter() {
-        let key = MetricKey { name: config.name.clone(), host: Host::Local };
-        let metric_ui = ui_for_metric(
-            &metrics_box, &gdk_window, &key,
-            &ls, &ms, &remotes, &sched);
-        metrics.insert(key, metric_ui);
-    }
-
-    for config in config.remote_checks.iter() {
-        let key = config.to_metric_key();
-        let metric_ui = ui_for_metric(
-            &metrics_box, &gdk_window, &key,
-            &ls, &ms, &remotes, &sched);
-        metrics.insert(key, metric_ui);
-    }
-
-    for config in config.remote_syncs.iter() {
-        let metrics_key = config.metrics_sync_key();
-        let metrics_metric_ui = ui_for_metric(
-            &metrics_box, &gdk_window, &metrics_key,
-            &ls, &ms, &remotes, &sched);
-        metrics.insert(metrics_key, metrics_metric_ui);
-
-        let logs_key = config.logs_sync_key();
-        let logs_metric_ui = ui_for_metric(
-            &metrics_box, &gdk_window, &logs_key,
-            &ls, &ms, &remotes, &sched);
-        metrics.insert(logs_key, logs_metric_ui);
-    }
+    let metrics = metrics(config, &metrics_box, &gdk_window, &ls, &ms, &remotes, &sched);
 
     window.show_all();
     for mui in metrics.values() {
@@ -342,32 +330,39 @@ fn build_ui(
         metrics,
         summary_label,
         thread: glib::MainContext::ref_thread_default(),
+        display_checks: Cell::new(DisplayChecks::All),
     });
 
-    {
-        // Subscribe to log messages and send them over a channel to the UI thread,
-        // which can then update the UI with logs.
+    // Connect handlers
 
-        let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
-
-        ls.lock().unwrap().update_signal().connect(move |log| {
-            if tx.send(log).is_err() {
-                error!("LogStore UI channel send error");
-            }
-            Continue::Continue
-        });
-
-        let uic = ui.clone();
-        rx.attach(Some(&ui.thread), move |log| {
-            let metric = uic.metrics.get(&log.key);
-            if let Some(metric) = metric {
-                metric.label_status.set_tooltip_text(Some(&log.log));
-            }
-            glib::source::Continue(true)
-        });
-    }
-
+    connect_log_updates(&ui, &ls);
     connect_metric_updates(&ui, &ms);
+
+    let uic = ui.clone();
+    let msc = ms.clone();
+    all_checks.connect_toggled(move |_rad| on_visible_radio_click(DisplayChecks::All, &uic, &msc));
+
+    let uic = ui.clone();
+    let msc = ms.clone();
+    err_checks.connect_toggled(move |_rad| on_visible_radio_click(DisplayChecks::Err, &uic, &msc));
+}
+
+fn on_visible_radio_click(checks: DisplayChecks, ui: &Rc<Ui>, ms: &Arc<Mutex<MetricStore>>) {
+    ui.display_checks.set(checks);
+    for (key, mui) in ui.metrics.iter() {
+        match checks {
+            DisplayChecks::All => mui.metric_box.show(),
+            DisplayChecks::Err => {
+                match ms.lock().unwrap().query_one(key) {
+                    Some(metric_store::Metric {
+                        latest: Some(DataPoint {ok: OkErr::Err, ..}),
+                        ..
+                    }) => mui.metric_box.show(),
+                    _ => mui.metric_box.hide(),
+                }
+            },
+        }
+    }
 }
 
 fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
@@ -378,6 +373,82 @@ fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
                     "{} <span fgcolor='{}'>Err</span> check(s)"),
             counts.ok, OK_COLOR,
             counts.err, ERR_COLOR));
+}
+
+fn metrics(
+    config: &config::Client,
+    metrics_box: &gtk::Box,
+    gdk_window: &gdk::Window,
+    ls: &Arc<Mutex<LogStore>>,
+    ms: &Arc<Mutex<MetricStore>>,
+    remotes: &Arc<remote::Remotes>,
+    sched: &Arc<Mutex<Scheduler>>
+) -> BTreeMap<MetricKey, Rc<MetricUi>>
+{
+    let mut metrics = BTreeMap::<MetricKey, Rc<MetricUi>>::new();
+
+    for config in config.shell_checks.iter() {
+        let key = MetricKey { name: config.name.clone(), host: Host::Local };
+        let metric_ui = ui_for_metric(
+            metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(key, metric_ui);
+    }
+
+    for config in config.shell_metrics.iter() {
+        let key = MetricKey { name: config.name.clone(), host: Host::Local };
+        let metric_ui = ui_for_metric(
+            metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(key, metric_ui);
+    }
+
+    for config in config.remote_checks.iter() {
+        let key = config.to_metric_key();
+        let metric_ui = ui_for_metric(
+            metrics_box, &gdk_window, &key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(key, metric_ui);
+    }
+
+    for config in config.remote_syncs.iter() {
+        let metrics_key = config.metrics_sync_key();
+        let metrics_metric_ui = ui_for_metric(
+            metrics_box, &gdk_window, &metrics_key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(metrics_key, metrics_metric_ui);
+
+        let logs_key = config.logs_sync_key();
+        let logs_metric_ui = ui_for_metric(
+            metrics_box, &gdk_window, &logs_key,
+            &ls, &ms, &remotes, &sched);
+        metrics.insert(logs_key, logs_metric_ui);
+    }
+
+    metrics
+}
+
+fn connect_log_updates(ui: &Rc<Ui>, ls: &Arc<Mutex<LogStore>>) {
+    // Subscribe to log messages and send them over a channel to the UI thread,
+    // which can then update the UI with logs.
+
+    let (tx, rx) = glib::MainContext::sync_channel(glib::source::Priority::default(), 50);
+
+    ls.lock().unwrap().update_signal().connect(move |log| {
+        if tx.send(log).is_err() {
+            error!("LogStore UI channel send error");
+        }
+        Continue::Continue
+    });
+
+    let uic = ui.clone();
+    rx.attach(Some(&ui.thread), move |log| {
+        let metric = uic.metrics.get(&log.key);
+        if let Some(metric) = metric {
+            metric.label_status.set_tooltip_text(Some(&log.log));
+        }
+        glib::source::Continue(true)
+    });
 }
 
 /// Subscribe to metric updates and send them over a channel to the UI thread,
@@ -414,6 +485,12 @@ fn connect_metric_updates(ui: &Rc<Ui>, ms: &Arc<Mutex<MetricStore>>) {
                                  MetricValue::I64(x) => x.to_string(),
                                  MetricValue::F64(x) => x.to_string(),
                              },));
+                if uic.display_checks.get() == DisplayChecks::Err {
+                    match dp.ok {
+                        OkErr::Ok => ui_metric.metric_box.hide(),
+                        OkErr::Err => ui_metric.metric_box.show(),
+                    }
+                }
             } else {
                 warn!("Couldn't find ui_metric for key '{}'", &metric.key.display_name());
             }
@@ -431,11 +508,16 @@ fn ui_for_metric<C>(
     ms: &Arc<Mutex<MetricStore>>,
     remotes: &Arc<remote::Remotes>,
     sched: &Arc<Mutex<Scheduler>>,
-) -> MetricUi
+) -> Rc<MetricUi>
     where C: IsA<gtk::Container> + IsA<gtk::Widget>
 {
-    let label_box = gtk::BoxBuilder::new()
+    let metric_box = gtk::BoxBuilder::new()
         .parent(container)
+        .orientation(gtk::Orientation::Vertical)
+        .build();
+
+    let label_box = gtk::BoxBuilder::new()
+        .parent(&metric_box)
         .orientation(gtk::Orientation::Horizontal)
         .build();
     let label_status = gtk::LabelBuilder::new()
@@ -449,7 +531,7 @@ fn ui_for_metric<C>(
 
     let buttons_box = gtk::BoxBuilder::new()
         .orientation(gtk::Orientation::Horizontal)
-        .parent(container)
+        .parent(&metric_box)
         .spacing(8)
         .build();
 
@@ -480,14 +562,15 @@ fn ui_for_metric<C>(
         .point_style(rt_graph::PointStyle::Cross)
         .build()
         .unwrap();
-    let graph = rt_graph::GraphWithControls::build_ui(config, container, &gdk_window);
+    let graph = rt_graph::GraphWithControls::build_ui(config, &metric_box, &gdk_window);
 
-    let metric_ui = MetricUi {
+    let metric_ui = Rc::new(MetricUi {
         label_status,
-        graph: Rc::new(graph),
-        showing_graph: Rc::new(Cell::new(false)),
+        graph: graph,
+        showing_graph: Cell::new(false),
         show_graph_btn,
-    };
+        metric_box,
+    });
 
     let muc = metric_ui.clone();
     metric_ui.show_graph_btn.connect_clicked(move |_btn| {
@@ -502,7 +585,6 @@ fn ui_for_metric<C>(
                 muc.show_graph_btn.set_label("Hide graph");
                 muc.graph.show();
             },
-
         }
     });
 

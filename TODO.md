@@ -10,7 +10,6 @@
 
 ## Features
 
-* View just failing checks.
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
 * Push checks (e.g. webhooks for Travis)
