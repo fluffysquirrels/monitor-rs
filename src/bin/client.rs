@@ -67,6 +67,11 @@ fn shell_check_configs() -> Vec<ShellCheck> {
             interval: config::Duration::Seconds(60),
         },
         ShellCheck {
+            name: "ping.f1-vpn".to_owned(),
+            cmd: "ping -c 1 -W 5 192.168.1.2".to_owned(),
+            interval: config::Duration::Seconds(60),
+        },
+        ShellCheck {
             name: "internet.up.gstatic".to_owned(),
             cmd: "curl http://connectivitycheck.gstatic.com/generate_204 -v -f -s".to_owned(),
             interval: config::Duration::Minutes(2),
