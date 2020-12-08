@@ -8,7 +8,7 @@ Collector {
         },
         ShellCheck {
             name: "jellyfin.mf.http",
-            cmd: "curl 'http://[::1]:8096/' --head --fail --connect-timeout 5 --no-progress-meter",
+            cmd: "curl 'http://localhost:8096/' --head --fail --connect-timeout 5 --no-progress-meter",
             interval: Seconds(30),
         },
     ],
