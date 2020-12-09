@@ -1,5 +1,6 @@
 Collector {
     host_name: "mf",
+    listen_addr: "192.168.0.36:6443",
     shell_checks: [
         ShellCheck {
             name: "zfs.mf.healthy",

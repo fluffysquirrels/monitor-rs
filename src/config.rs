@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Collector {
     pub host_name: String,
+    pub listen_addr: String,
     pub shell_checks: Vec<ShellCheck>,
     pub shell_metrics: Vec<ShellMetric>,
     pub server_tls_identity: Option<TlsIdentity>,

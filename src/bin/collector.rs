@@ -36,7 +36,7 @@ async fn main() {
 
     sched.lock().unwrap().spawn();
 
-    let addr: std::net::SocketAddr = "0.0.0.0:8443".parse().unwrap();
+    let addr: std::net::SocketAddr = config.listen_addr.parse().unwrap();
     let collector_service = CollectorService {
         config: config.clone(),
         log_store: ls.clone(),
