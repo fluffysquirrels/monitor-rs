@@ -201,6 +201,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "collector"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "monitor",
+ "rudano",
+ "tokio",
+ "tonic",
+]
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -645,8 +657,6 @@ dependencies = [
  "gtk",
  "log",
  "monitor",
- "process_control",
- "prost",
  "rt-graph",
  "rudano",
 ]

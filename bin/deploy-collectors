@@ -5,7 +5,7 @@ set -eux;
 readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
 
 cd "${package_dir}";
-cargo build --release --bin collector;
+cargo build --release --package collector;
 
 for server in mf f1 ; do
     ssh ${server} "sudo /bin/systemctl stop monitor-collector.service"
