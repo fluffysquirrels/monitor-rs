@@ -23,6 +23,7 @@ tonic-build = "0.3.1"
 [workspace]
 members = [
     ".",
-    "bins/gtk-client",
     "bins/collector",
+    "bins/gtk-client",
+    "bins/web",
 ]

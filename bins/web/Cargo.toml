@@ -1,0 +1,15 @@
+[package]
+name = "web"
+version = "0.1.0"
+authors = ["Alex Helfet <alex.helfet@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+actix-web = { version = "3.3.2", features = ["rustls"] }
+askama = "0.8.0"
+env_logger = "0.7"
+log = { version = "0.4.11" }
+monitor = { path = "../.." }
+rudano = "0.1.0"
+# rust-argon2 = "0.8.3"
+rustls = "0.18.0" # Matches actix-web's version

@@ -19,6 +19,13 @@ pub struct GtkClient {
     pub remote_checks: Vec<RemoteCheck>,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Web {
+    pub listen_addr: String,
+    pub remote_syncs: Vec<RemoteSync>,
+    pub server_tls_identity: Option<TlsIdentity>,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TlsIdentity {
     pub cert_path: String,
