@@ -12,7 +12,7 @@ pub struct Collector {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Client {
+pub struct GtkClient {
     pub shell_checks: Vec<ShellCheck>,
     pub shell_metrics: Vec<ShellMetric>,
     pub remote_syncs: Vec<RemoteSync>,

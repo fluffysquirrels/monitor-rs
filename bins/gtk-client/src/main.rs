@@ -137,8 +137,8 @@ egrep '^\"passed\"$'",
     }
 }
 
-fn config() -> config::Client {
-    config::Client {
+fn config() -> config::GtkClient {
+    config::GtkClient {
         shell_checks: shell_check_configs(),
         shell_metrics: shell_metric_configs(),
         remote_syncs: vec![
@@ -255,7 +255,7 @@ fn main() {
 }
 
 fn build_ui(
-    config: &config::Client,
+    config: &config::GtkClient,
     application: &gtk::Application,
     ls: Arc<Mutex<LogStore>>,
     ms: Arc<Mutex<MetricStore>>,
@@ -381,7 +381,7 @@ fn update_summary_label(ui: &Ui, ms: &Arc<Mutex<MetricStore>>) {
 }
 
 fn metrics(
-    config: &config::Client,
+    config: &config::GtkClient,
     metrics_box: &gtk::Box,
     gdk_window: &gdk::Window,
     ls: &Arc<Mutex<LogStore>>,
