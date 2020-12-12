@@ -2,6 +2,8 @@
 
 ## WIP
 
+* Web front-end
+
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
@@ -10,6 +12,20 @@
 
 ## Features
 
+* Web front-end
+    * Authentication
+        * Login page
+        * User password hash hard-coded for now
+        * Argon2id-based password hashing
+        * Session storage with random bytes as key,
+          with base64 url safe encoding
+              <https://docs.rs/base64/0.13.0/base64/constant.URL_SAFE_NO_PAD.html>
+          with in-memory backing for now (move to DB or out of process in-memory store later)
+    * Anti-CSRF
+    * Show check results
+        * Start with statically rendered HTML
+        * Then JS rendered from JSON injected into the page
+        * Then JS rendered from JSON sent over a WebSocket
 * Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
@@ -20,7 +36,6 @@
     * `collector` server handler wakes up and pushes the metric into `MetricStore`.
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
-* Web or Android front end. [actix-web](https://github.com/actix/actix-web) looks good
 * Distributed architecture libs:
   [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,

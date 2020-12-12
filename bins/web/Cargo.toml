@@ -13,3 +13,4 @@ monitor = { path = "../.." }
 rudano = "0.1.0"
 # rust-argon2 = "0.8.3"
 rustls = "0.18.0" # Matches actix-web's version
+serde = "1.0.118"
