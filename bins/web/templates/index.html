@@ -1,5 +1,36 @@
 {% extends "base.html" %}
+
+{% block head %}
+    <style type="text/css">
+      .metric-value-missing {
+          color: #cc0000;
+      }
+
+      .metric-value-Ok {
+          color: #00cc00;
+      }
+
+      .metric-value-Err {
+          color: #cc0000;
+      }
+    </style>
+{% endblock %}
+
 {% block main %}
-    <h1>Hello, World!</h1>
-    <div>I am <span>{{ mood|e  }}</span> doing <span>{{ task|e }}</span> today</div>
+    <h1>Metrics</h1>
+    <div>
+      {% for metric in metrics %}
+      <div class="metric">
+        {% match metric.latest %}
+          {% when Some with (dp) %}
+            <span class="metric-value metric-value-{{ dp.ok.to_string() }}">
+              {{ dp.value_string()|e }}
+            </span>
+          {% when None %}
+            <span class="metric-value metric-value-missing">?</span>
+        {% endmatch %}
+        <span class="metric-name">{{ metric.key.display_name()|e }}</span>
+      </div>
+      {% endfor %}
+    </div>
 {% endblock %}

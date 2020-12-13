@@ -13,18 +13,43 @@ use crate::{
 use monitor::{
     // BoxError,
     config,
+    log_store::{self, LogStore},
+    metric_store::{self, Metric, MetricStore},
+    remote,
 };
 use serde::Deserialize;
 use std::{
     fs::File,
     io::BufReader,
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 fn config() -> config::Web {
     config::Web {
         listen_addr: "127.0.0.1:8443".to_owned(),
-        remote_syncs: vec![],
+        remote_syncs: vec![
+            config::RemoteSync {
+                url: "https://mf:6443".to_owned(),
+                server_ca: config::TlsCertificate {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
+                },
+                client_identity: config::TlsIdentity {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
+                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
+                },
+            },
+            config::RemoteSync {
+                url: "https://f1:6443".to_owned(),
+                server_ca: config::TlsCertificate {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
+                },
+                client_identity: config::TlsIdentity {
+                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
+                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
+                },
+            },
+
+        ],
         server_tls_identity: Some(config::TlsIdentity {
             cert_path: "/home/alex/Code/rust/monitor/cert/ok/mf.fullchain".to_owned(),
             key_path: "/home/alex/Code/rust/monitor/cert/ok/mf.key".to_owned(),
@@ -36,6 +61,9 @@ fn config() -> config::Web {
 struct AppContext {
     auth: Arc<Auth>,
     config: config::Web,
+    log_store: Arc<Mutex<LogStore>>,
+    metric_store: Arc<Mutex<MetricStore>>,
+    remotes: Arc<remote::Remotes>,
     sessions: Arc<Sessions>,
 }
 
@@ -49,9 +77,19 @@ async fn main() -> std::io::Result<()> {
     let config = config();
     trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
 
+    let ls = Arc::new(Mutex::new(LogStore::new()));
+    let ms = Arc::new(Mutex::new(MetricStore::new()));
+    let remotes = remote::Remotes::from_configs(&config.remote_syncs)
+                                  .expect("RemoteSync configs OK");
+    let remotes = Arc::new(remotes);
+    remote::spawn_sync_jobs(&remotes, &ls, &ms);
+
     let ctx = actix_web::web::Data::new(AppContext {
         auth: Arc::new(Auth::new()),
         config: config.clone(),
+        log_store: ls,
+        metric_store: ms,
+        remotes,
         sessions: Arc::new(Sessions::new()),
     });
 
@@ -120,9 +158,8 @@ fn render_500<B>(mut res: actix_web::dev::ServiceResponse<B>
 
 #[derive(Template)]
 #[template(path = "index.html")]
-struct IndexTemplate<'a> {
-    mood: &'a str,
-    task: &'a str,
+struct IndexTemplate {
+    metrics: Vec<Metric>,
 }
 
 async fn index(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
@@ -136,11 +173,11 @@ async fn index(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
     }
 
     // Authenticated.
+    let metrics = ctx.metric_store.lock().unwrap().query_all();
     let mut res = HttpResponse::Ok();
     res.content_type("text/html");
     let res = res.body((IndexTemplate {
-        mood: "determined",
-        task: "<html>",
+        metrics,
     }).render().unwrap());
     Ok(res)
 }

@@ -46,6 +46,15 @@ impl<T, E> From<Result<T, E>> for OkErr {
     }
 }
 
+impl std::fmt::Display for OkErr {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        f.write_str(match self {
+            OkErr::Ok => "Ok",
+            OkErr::Err => "Err",
+        })
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub struct MetricKey {
     pub name: String,
@@ -122,6 +131,16 @@ pub struct DataPoint {
     pub time: chrono::DateTime<chrono::Utc>,
     pub val: MetricValue,
     pub ok: OkErr,
+}
+
+impl DataPoint {
+    pub fn value_string(&self) -> String {
+        match self.val {
+            MetricValue::None => self.ok.to_string(),
+            MetricValue::I64(x) => x.to_string(),
+            MetricValue::F64(x) => x.to_string(),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

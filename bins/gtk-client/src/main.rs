@@ -53,6 +53,7 @@ enum DisplayChecks {
 
 const OK_COLOR: &'static str = "#00cc00";
 const ERR_COLOR: &'static str = "#cc0000";
+const MISSING_COLOR: &'static str = "#cccc00";
 
 fn shell_check_configs() -> Vec<ShellCheck> {
     vec![
@@ -481,15 +482,7 @@ fn connect_metric_updates(ui: &Rc<Ui>, ms: &Arc<Mutex<MetricStore>>) {
                     OkErr::Err => ERR_COLOR,
                 };
                 ui_metric.label_status.set_markup(
-                    &format!("<span fgcolor='{}'>{}</span>", fgcolor,
-                             match dp.val {
-                                 MetricValue::None => match dp.ok {
-                                     OkErr::Ok => "Ok".to_owned(),
-                                     OkErr::Err => "Err".to_owned(),
-                                 },
-                                 MetricValue::I64(x) => x.to_string(),
-                                 MetricValue::F64(x) => x.to_string(),
-                             },));
+                    &format!("<span fgcolor='{}'>{}</span>", fgcolor, dp.value_string()));
                 if uic.display_checks.get() == DisplayChecks::Err {
                     match dp.ok {
                         OkErr::Ok => ui_metric.metric_box.hide(),
@@ -528,7 +521,7 @@ fn ui_for_metric<C>(
     let label_status = gtk::LabelBuilder::new()
         .parent(&label_box)
         .build();
-    label_status.set_markup("<span fgcolor='#cccc00'>?</span>");
+    label_status.set_markup(&format!("<span fgcolor='{}'>?</span>", MISSING_COLOR));
     let _label = gtk::LabelBuilder::new()
         .label(&format!(" = {}", metric_key.display_name()))
         .parent(&label_box)

@@ -48,7 +48,6 @@ impl Auth {
             username: username.to_owned(),
             password_hash: hash,
         };
-        trace!("New user: {:?}", user);
         Ok(user)
     }
 
