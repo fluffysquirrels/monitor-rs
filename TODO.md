@@ -15,12 +15,10 @@
 * Web front-end
     * Authentication
         * Test expired sessions.
-        * Argon2id-based password hashing
-        * User password hash hard-coded for now
         * Session storage with in-memory backing for now (move to DB
           or out of process in-memory store later)
             * This is a big old memory leak right now. Enforce one session per user?
-        * Refresh sessions near their expiry (50% towards expiry?).
+        * Refresh sessions near their expiry? (50% towards expiry?)
     * Anti-CSRF
     * External stylesheet
     * Show check results

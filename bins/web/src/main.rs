@@ -1,11 +1,15 @@
 #[macro_use]
 extern crate log;
 
+mod auth;
 mod session;
 
 use actix_web::{HttpRequest, HttpResponse, Responder};
 use askama::Template;
-use crate::session::Sessions;
+use crate::{
+    auth::Auth,
+    session::Sessions,
+};
 use monitor::{
     // BoxError,
     config,
@@ -30,6 +34,7 @@ fn config() -> config::Web {
 
 #[derive(Clone)]
 struct AppContext {
+    auth: Arc<Auth>,
     config: config::Web,
     sessions: Arc<Sessions>,
 }
@@ -45,6 +50,7 @@ async fn main() -> std::io::Result<()> {
     trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
 
     let ctx = actix_web::web::Data::new(AppContext {
+        auth: Arc::new(Auth::new()),
         config: config.clone(),
         sessions: Arc::new(Sessions::new()),
     });
@@ -165,10 +171,9 @@ async fn login_post(
     _req: HttpRequest,
     form: actix_web::web::Form<LoginPostArgs>,
 ) -> actix_web::Result<impl Responder> {
-    // TODO.
-    let auth = form.password == "asdf";
+    let auth_token = ctx.auth.login(&form.username, &form.password);
 
-    if auth {
+    if auth_token.is_some() {
         let mut res = HttpResponse::SeeOther(); // 303
         if let Err(e) = ctx.sessions.login(&mut res) {
             error!("Error calling Sessions::login: {}", e);
@@ -177,6 +182,8 @@ async fn login_post(
         res.header(actix_web::http::header::LOCATION, "/");
         Ok(res.finish())
     } else {
+        assert!(auth_token.is_none());
+
         let mut res = HttpResponse::Unauthorized(); // 401
         res.content_type("text/html");
         let res = res.body((LoginTemplate { message: Some("Bad username or password") })
