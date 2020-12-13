@@ -1,7 +1,19 @@
 {% extends "base.html" %}
-{% block body %}
-    <a href="/login">Login</a>
+
+{% block head %}
+    <style type="text/css">
+label {
+    width: 100px;
+    display: inline-block;
+}
+    </style>
+{% endblock %}
+
+{% block main %}
     <h1>Login</h1>
+    {% if message.is_some() %}
+    <div>{{ message.unwrap()|e }}</div>
+    {% endif %}
     <form action="/login" method="post">
       <div>
         <label for="username">Username</label>

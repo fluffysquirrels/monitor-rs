@@ -14,14 +14,15 @@
 
 * Web front-end
     * Authentication
-        * Login page
-        * User password hash hard-coded for now
+        * Test expired sessions.
         * Argon2id-based password hashing
-        * Session storage with random bytes as key,
-          with base64 url safe encoding
-              <https://docs.rs/base64/0.13.0/base64/constant.URL_SAFE_NO_PAD.html>
-          with in-memory backing for now (move to DB or out of process in-memory store later)
+        * User password hash hard-coded for now
+        * Session storage with in-memory backing for now (move to DB
+          or out of process in-memory store later)
+            * This is a big old memory leak right now. Enforce one session per user?
+        * Refresh sessions near their expiry (50% towards expiry?).
     * Anti-CSRF
+    * External stylesheet
     * Show check results
         * Start with statically rendered HTML
         * Then JS rendered from JSON injected into the page

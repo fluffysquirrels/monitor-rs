@@ -1,15 +1,20 @@
 #[macro_use]
 extern crate log;
 
+mod session;
+
 use actix_web::{HttpRequest, HttpResponse, Responder};
 use askama::Template;
+use crate::session::Sessions;
 use monitor::{
     // BoxError,
     config,
 };
+use serde::Deserialize;
 use std::{
     fs::File,
     io::BufReader,
+    sync::Arc,
 };
 
 fn config() -> config::Web {
@@ -26,6 +31,7 @@ fn config() -> config::Web {
 #[derive(Clone)]
 struct AppContext {
     config: config::Web,
+    sessions: Arc<Sessions>,
 }
 
 #[actix_web::main]
@@ -40,6 +46,7 @@ async fn main() -> std::io::Result<()> {
 
     let ctx = actix_web::web::Data::new(AppContext {
         config: config.clone(),
+        sessions: Arc::new(Sessions::new()),
     });
 
     let server = actix_web::HttpServer::new(move || {
@@ -57,6 +64,7 @@ async fn main() -> std::io::Result<()> {
             .route("/", actix_web::web::get().to(index))
             .route("/login", actix_web::web::get().to(login_get))
             .route("/login", actix_web::web::post().to(login_post))
+            .route("/logout", actix_web::web::get().to(logout_get))
     });
 
     match config.server_tls_identity {
@@ -111,8 +119,17 @@ struct IndexTemplate<'a> {
     task: &'a str,
 }
 
-async fn index(_ctx: actix_web::web::Data<AppContext>, _req: HttpRequest
+async fn index(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
 ) -> actix_web::Result<impl Responder> {
+    // If not logged in, redirect to "/login".
+    let session = ctx.sessions.get(&req);
+    if session.is_none() {
+        let mut res = HttpResponse::SeeOther(); // 303
+        res.header(actix_web::http::header::LOCATION, "/login");
+        return Ok(res.finish())
+    }
+
+    // Authenticated.
     let mut res = HttpResponse::Ok();
     res.content_type("text/html");
     let res = res.body((IndexTemplate {
@@ -124,18 +141,18 @@ async fn index(_ctx: actix_web::web::Data<AppContext>, _req: HttpRequest
 
 #[derive(Template)]
 #[template(path = "login.html")]
-struct LoginTemplate {}
+struct LoginTemplate<'a> {
+    message: Option<&'a str>,
+}
 
 async fn login_get(_ctx: actix_web::web::Data<AppContext>, _req: HttpRequest
 ) -> actix_web::Result<impl Responder> {
     let mut res = HttpResponse::Ok();
     res.content_type("text/html");
-    let res = res.body((LoginTemplate {})
+    let res = res.body((LoginTemplate { message: None })
                            .render().unwrap());
     Ok(res)
 }
-
-use serde::Deserialize;
 
 #[derive(Deserialize)]
 struct LoginPostArgs {
@@ -144,13 +161,37 @@ struct LoginPostArgs {
 }
 
 async fn login_post(
-    _ctx: actix_web::web::Data<AppContext>,
+    ctx: actix_web::web::Data<AppContext>,
     _req: HttpRequest,
     form: actix_web::web::Form<LoginPostArgs>,
 ) -> actix_web::Result<impl Responder> {
+    // TODO.
+    let auth = form.password == "asdf";
+
+    if auth {
+        let mut res = HttpResponse::SeeOther(); // 303
+        if let Err(e) = ctx.sessions.login(&mut res) {
+            error!("Error calling Sessions::login: {}", e);
+            return Err(().into());
+        }
+        res.header(actix_web::http::header::LOCATION, "/");
+        Ok(res.finish())
+    } else {
+        let mut res = HttpResponse::Unauthorized(); // 401
+        res.content_type("text/html");
+        let res = res.body((LoginTemplate { message: Some("Bad username or password") })
+                           .render().unwrap());
+        Ok(res)
+    }
+}
+
+async fn logout_get(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
+) -> actix_web::Result<impl Responder> {
     let mut res = HttpResponse::Ok();
     res.content_type("text/html");
-    let res = res.body((LoginTemplate {})
+
+    ctx.sessions.logout(&req, &mut res);
+    let res = res.body((LoginTemplate { message: Some("Logged out") })
                            .render().unwrap());
     Ok(res)
 }
