@@ -1,0 +1,11 @@
+[Unit]
+Description=monitor-web metric GUI
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/lib/monitor/web
+User=monitor-web
+
+[Install]
+WantedBy=multi-user.target

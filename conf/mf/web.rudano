@@ -1,0 +1,26 @@
+Web {
+    listen_addr: "192.168.0.36:8443",
+    remote_syncs: [RemoteSync {
+        url: "https://mf:6443",
+        server_ca: TlsCertificate {
+            cert_path: "/usr/local/lib/monitor/cert/ca.cert",
+        },
+        client_identity: TlsIdentity {
+            cert_path: "/usr/local/lib/monitor/cert/mf.fullchain",
+            key_path: "/usr/local/lib/monitor/cert/mf.key",
+        },
+    }, RemoteSync {
+        url: "https://f1:6443",
+        server_ca: TlsCertificate {
+            cert_path: "/usr/local/lib/monitor/cert/ca.cert",
+        },
+        client_identity: TlsIdentity {
+            cert_path: "/usr/local/lib/monitor/cert/mf.fullchain",
+            key_path: "/usr/local/lib/monitor/cert/mf.key",
+        },
+    }],
+    server_tls_identity: Some(TlsIdentity {
+        cert_path: "/usr/local/lib/monitor/cert/mf.fullchain",
+        key_path: "/usr/local/lib/monitor/cert/mf.key",
+    }),
+}

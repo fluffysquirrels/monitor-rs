@@ -13,8 +13,8 @@ use crate::{
 use monitor::{
     // BoxError,
     config,
-    log_store::{self, LogStore},
-    metric_store::{self, Metric, MetricStore},
+    log_store::{LogStore},
+    metric_store::{Metric, MetricStore},
     remote,
 };
 use serde::Deserialize;
@@ -23,39 +23,6 @@ use std::{
     io::BufReader,
     sync::{Arc, Mutex},
 };
-
-fn config() -> config::Web {
-    config::Web {
-        listen_addr: "127.0.0.1:8443".to_owned(),
-        remote_syncs: vec![
-            config::RemoteSync {
-                url: "https://mf:6443".to_owned(),
-                server_ca: config::TlsCertificate {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
-                },
-                client_identity: config::TlsIdentity {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
-                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
-                },
-            },
-            config::RemoteSync {
-                url: "https://f1:6443".to_owned(),
-                server_ca: config::TlsCertificate {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert".to_owned(),
-                },
-                client_identity: config::TlsIdentity {
-                    cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain".to_owned(),
-                    key_path:  "/home/alex/Code/rust/monitor/cert/ok/plato.key".to_owned(),
-                },
-            },
-
-        ],
-        server_tls_identity: Some(config::TlsIdentity {
-            cert_path: "/home/alex/Code/rust/monitor/cert/ok/mf.fullchain".to_owned(),
-            key_path: "/home/alex/Code/rust/monitor/cert/ok/mf.key".to_owned(),
-        }),
-    }
-}
 
 #[derive(Clone)]
 struct AppContext {
@@ -74,7 +41,7 @@ async fn main() -> std::io::Result<()> {
         .format_timestamp_micros()
         .init();
 
-    let config = config();
+    let config = load_config();
     trace!("rudano config=\n{}", rudano::to_string_pretty(&config).unwrap());
 
     let ls = Arc::new(Mutex::new(LogStore::new()));
@@ -128,6 +95,19 @@ async fn main() -> std::io::Result<()> {
         }
     };
     Ok(())
+}
+
+fn load_config() -> config::Web {
+    // Panic on error because without config we can't continue.
+
+    let exe_path = std::env::current_exe().expect("Expect to retrieve current exe path");
+    let exe_dir = exe_path.parent().expect("Expect to retrieve current exe parent");
+    let config_path = exe_dir.join("web.rudano");
+
+    let config_str = std::fs::read_to_string(&config_path)
+        .unwrap_or_else(|e| panic!("Error reading the config file from `{:?}': {}",
+                                  &config_path, e));
+    rudano::from_str(&config_str).expect("Config file to parse")
 }
 
 fn render_404<B>(mut res: actix_web::dev::ServiceResponse<B>

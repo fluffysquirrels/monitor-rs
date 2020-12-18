@@ -1,0 +1,26 @@
+Web {
+    listen_addr: "127.0.0.1:8443",
+    remote_syncs: [RemoteSync {
+        url: "https://mf:6443",
+        server_ca: TlsCertificate {
+            cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert",
+        },
+        client_identity: TlsIdentity {
+            cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain",
+            key_path: "/home/alex/Code/rust/monitor/cert/ok/plato.key",
+        },
+    }, RemoteSync {
+        url: "https://f1:6443",
+        server_ca: TlsCertificate {
+            cert_path: "/home/alex/Code/rust/monitor/cert/ok/ca.cert",
+        },
+        client_identity: TlsIdentity {
+            cert_path: "/home/alex/Code/rust/monitor/cert/ok/plato.fullchain",
+            key_path: "/home/alex/Code/rust/monitor/cert/ok/plato.key",
+        },
+    }],
+    server_tls_identity: Some(TlsIdentity {
+        cert_path: "/home/alex/Code/rust/monitor/cert/ok/mf.fullchain",
+        key_path: "/home/alex/Code/rust/monitor/cert/ok/mf.key",
+    }),
+}

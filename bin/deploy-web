@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -eux;
+
+# Compute package directory.
+readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
+
+cd "${package_dir}";
+cargo build --release --package web;
+
+for server in mf ; do
+    ssh ${server} "sudo /bin/systemctl stop monitor-web.service"
+    scp target/release/web ${server}:/usr/local/lib/monitor/;
+    scp conf/${server}/web.rudano ${server}:/usr/local/lib/monitor/;
+    ssh ${server} "sudo /bin/systemctl start monitor-web.service &&
+                   sleep 1 &&
+                   /bin/systemctl status monitor-web.service";
+done
