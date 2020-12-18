@@ -51,7 +51,9 @@ pub struct Remote {
 
 impl Remote {
     pub fn from_config(config: config::RemoteSync) -> Result<Remote, BoxError> {
-        let endpoint = sync_endpoint(&config)?;
+        let endpoint = sync_endpoint(&config)
+                       .map_err(|e| format!("Remote::from_config error for remote url={}: {}",
+                                            config.url, e))?;
         let pool = Arc::new(collector_pool::Pool::new(&config.url, endpoint));
         Ok(Remote {
             config,
@@ -297,14 +299,16 @@ fn sync_endpoint(config: &config::RemoteSync
 ) -> Result<tonic::transport::Endpoint, BoxError> {
     let url = config.url.parse::<tonic::transport::Uri>()?;
     let host = url.host().ok_or("Missing endpoint URL host")?;
-    let scheme = url.scheme().ok_or("Missing endpoint URL host")?;
+    let scheme = url.scheme().ok_or("Missing endpoint URL scheme")?;
     let endpoint =
         tonic::transport::Endpoint::from_shared(config.url.clone())?
         .http2_keep_alive_interval(std::time::Duration::from_secs(60))
         .keep_alive_timeout(std::time::Duration::from_secs(15))
         .keep_alive_while_idle(true);
-    let client_id = config.client_identity.load()?;
-    let server_ca_cert = config.server_ca.load()?;
+    let client_id = config.client_identity.load()
+                    .map_err(|e| format!("Error loading client identity: {}", e))?;
+    let server_ca_cert = config.server_ca.load()
+                         .map_err(|e| format!("Error loading server CA: {}", e))?;
     let endpoint = if *scheme == http::uri::Scheme::HTTPS {
         let client_tls = tonic::transport::ClientTlsConfig::new()
             .domain_name(host)
