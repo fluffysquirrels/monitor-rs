@@ -16,6 +16,7 @@ pub struct User {
 }
 
 pub struct AuthToken {
+    #[allow(dead_code)] // Not used yet.
     username: String,
 }
 
@@ -32,6 +33,7 @@ impl Auth {
         }
     }
 
+    #[allow(dead_code)] // No register yet.
     pub fn create_user(&self, username: &str, password: &str) -> Result<User, String> {
         let mut salt = [0; 16]; // 16 bytes = 128 bits.
         self.rng.fill(&mut salt).map_err(|_| "Failed to generate random salt")?;

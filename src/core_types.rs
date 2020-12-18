@@ -1,3 +1,5 @@
+use crate::collector;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OkErr {
     Ok,
