@@ -14,6 +14,7 @@
 
 * Web front-end
     * Authentication
+        * Track login time?
         * Test expired sessions.
         * Session storage with in-memory backing for now (move to DB
           or out of process in-memory store later)
@@ -25,6 +26,7 @@
         * Start with statically rendered HTML
         * Then JS rendered from JSON injected into the page
         * Then JS rendered from JSON sent over a WebSocket
+    * Notifications
 * Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
@@ -57,6 +59,7 @@
 
 ## Improvements
 
+* Separate CA's for clients and servers; currently server certs can be used as sync client certs.
 * Ideally it would be zero lines of config to show a remote check in the UI.
 * The scheduler detects resume from suspend, it would be nice to restart
   the sync jobs at the same time.
