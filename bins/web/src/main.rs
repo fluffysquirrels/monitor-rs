@@ -60,6 +60,11 @@ async fn main() -> std::io::Result<()> {
         sessions: Arc::new(Sessions::new()),
     });
 
+    let exe_path = std::env::current_exe().expect("Expect to retrieve current exe path");
+    let exe_dir = exe_path.parent().expect("Expect to retrieve current exe parent");
+    let web_static_path = exe_dir.join("web-static");
+    assert!(web_static_path.exists(), "path for /static must exist at `{:?}'", web_static_path);
+
     let server = actix_web::HttpServer::new(move || {
         actix_web::App::new()
             .wrap(actix_web::middleware::Logger::default())
@@ -76,6 +81,9 @@ async fn main() -> std::io::Result<()> {
             .route("/login", actix_web::web::get().to(login_get))
             .route("/login", actix_web::web::post().to(login_post))
             .route("/logout", actix_web::web::get().to(logout_get))
+            .service(actix_files::Files::new("/static", web_static_path.clone())
+                     .use_last_modified(true)
+                     .show_files_listing())
     });
 
     match config.server_tls_identity {

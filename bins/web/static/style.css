@@ -1,0 +1,16 @@
+.metric-value-missing {
+    color: #cc0000;
+}
+
+.metric-value-Ok {
+    color: #00cc00;
+}
+
+.metric-value-Err {
+    color: #cc0000;
+}
+
+#login label {
+    width: 100px;
+    display: inline-block;
+}

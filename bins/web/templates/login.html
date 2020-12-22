@@ -1,30 +1,23 @@
 {% extends "base.html" %}
 
-{% block head %}
-    <style type="text/css">
-label {
-    width: 100px;
-    display: inline-block;
-}
-    </style>
-{% endblock %}
-
 {% block main %}
-    <h1>Login</h1>
-    {% if message.is_some() %}
-    <div>{{ message.unwrap()|e }}</div>
-    {% endif %}
-    <form action="/login" method="post">
-      <div>
-        <label for="username">Username</label>
-        <input type="text" name="username" id="username"></input>
-      </div>
-      <div>
-        <label for="password">Password</label>
-        <input type="password" name="password" id="password"></input>
-      </div>
-      <div>
-        <button type="submit">Login</button>
-      </div>
-    </form>
+    <div id="login">
+      <h1>Login</h1>
+      {% if message.is_some() %}
+      <div>{{ message.unwrap()|e }}</div>
+      {% endif %}
+      <form action="/login" method="post">
+        <div>
+          <label for="username">Username</label>
+          <input type="text" name="username" id="username"></input>
+        </div>
+        <div>
+          <label for="password">Password</label>
+          <input type="password" name="password" id="password"></input>
+        </div>
+        <div>
+          <button type="submit">Login</button>
+        </div>
+      </form>
+    </div>
 {% endblock %}

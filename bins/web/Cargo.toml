@@ -5,6 +5,7 @@ authors = ["Alex Helfet <alex.helfet@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+actix-files = "0.4.1"
 actix-web = { version = "3.3.2", features = ["rustls"] }
 askama = "0.8.0"
 base64 = "0.13.0"
