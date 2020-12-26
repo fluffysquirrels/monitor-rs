@@ -3,6 +3,8 @@
 ## WIP
 
 * Web front-end
+    * Get metric updates over WebSocket
+        * Authenticate WebSocket
 
 ## Bugs
 
@@ -13,6 +15,11 @@
 ## Features
 
 * Web front-end
+    * WebSocket
+        * Send protobuf encoded frames,
+          use [protobuf.js](https://www.npmjs.com/package/protobufjs)
+    * Notifications when page is open
+    * Notifications when page is not open?
     * Authentication
         * Track login time?
         * Test expired sessions.
@@ -37,6 +44,9 @@
     * `collector` server handler wakes up and pushes the metric into `MetricStore`.
 * Configure flakey metric detection: need at least n failures before notification.
 * Metric type F64.
+* DB:
+  [sled](https://github.com/spacejam/sled) or
+  postgres.
 * Distributed architecture libs:
   [tonic](https://github.com/hyperium/tonic) looks good for gRPC,
   [sqlx](https://github.com/launchbadge/sqlx) looks good for DB access,
@@ -59,6 +69,8 @@
 
 ## Improvements
 
+* Sync jobs fail loudly on resume, would be nice to special case this
+  like the scheduler sleep on resume.
 * Separate CA's for clients and servers; currently server certs can be used as sync client certs.
 * Ideally it would be zero lines of config to show a remote check in the UI.
 * The scheduler detects resume from suspend, it would be nice to restart
