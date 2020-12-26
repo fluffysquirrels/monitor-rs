@@ -5,12 +5,15 @@ set -eux;
 readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
 
 cd "${package_dir}";
-cargo build --release --package web;
+
+bin/build-web;
 
 for server in mf ; do
     ssh ${server} "sudo /bin/systemctl stop monitor-web.service"
     scp target/release/web ${server}:/usr/local/lib/monitor/;
     scp conf/${server}/web.rudano ${server}:/usr/local/lib/monitor/;
+    ssh ${server} rm -rf /usr/local/lib/monitor/web-static/;
+    scp -r bins/web/static/ ${server}:/usr/local/lib/monitor/web-static/;
     ssh ${server} "sudo /bin/systemctl start monitor-web.service &&
                    sleep 1 &&
                    /bin/systemctl status monitor-web.service";

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package monitor_web_socket;
+
+message ToServer {
+  oneof msg {
+    AuthenticateRequest auth_req = 1;
+  }
+}
+
+message AuthenticateRequest {
+  string key = 1;
+}
+
+message ToClient {
+  oneof msg {
+    AuthenticateResponse auth_resp = 1;
+  }
+}
+
+message AuthenticateResponse {
+  bool ok = 1;
+}

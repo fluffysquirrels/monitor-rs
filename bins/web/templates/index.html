@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% block head %}
+    <script type="text/javascript" src="/static/third-party/protobuf.js-6.10.2/dist/minimal/protobuf.min.js" defer="true"></script>
+    <script type="text/javascript" src="/static/monitor_web_socket.js" defer="true"></script>
+    <script type="module" src="/static/index.js"></script>
+{% endblock %}
+
 {% block main %}
     <h1>Metrics</h1>
     <div>

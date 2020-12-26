@@ -5,17 +5,24 @@ authors = ["Alex Helfet <alex.helfet@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+actix = "0.10.0" # Matches actix-web-actors' version
 actix-files = "0.4.1"
 actix-web = { version = "3.3.2", features = ["rustls"] }
+actix-web-actors = "3.0.0"
 askama = "0.8.0"
 base64 = "0.13.0"
 cookie = "0.14.3" # Matches actix-web's version
 env_logger = "0.7"
 log = { version = "0.4.11" }
 monitor = { path = "../.." }
+prost = "0.6.1"
 ring = "0.16.19"
 rudano = "0.1.0"
 rust-argon2 = "0.8.3"
 rustls = "0.18.0" # Matches actix-web's version
 serde = "1.0.118"
 time = "0.2.23" # Matches actix-web's version
+tonic = "0.3.1"
+
+[build-dependencies]
+tonic-build = "0.3.1"

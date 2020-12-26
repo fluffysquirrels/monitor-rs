@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -eux;
+
+# Compute package directory.
+readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
+
+cd "${package_dir}";
+
+cargo build --release --package web;
+
+bins/web/third-party/protobuf.js-6.10.2/bin/pbjs \
+    -t static-module -w closure \
+    bins/web/proto/web_socket.proto \
+    -o bins/web/static/monitor_web_socket.js;

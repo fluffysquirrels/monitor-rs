@@ -4,7 +4,14 @@ extern crate log;
 mod auth;
 mod session;
 
+mod web_socket_types {
+    //! Protobuf types for the WebSocket endpoint
+
+    tonic::include_proto!("monitor_web_socket");
+}
+
 use actix_web::{HttpRequest, HttpResponse, Responder};
+use actix_web_actors::ws;
 use askama::Template;
 use crate::{
     auth::Auth,
@@ -17,6 +24,7 @@ use monitor::{
     metric_store::{Metric, MetricStore},
     remote,
 };
+use prost::Message;
 use serde::Deserialize;
 use std::{
     fs::File,
@@ -57,7 +65,7 @@ async fn main() -> std::io::Result<()> {
         log_store: ls,
         metric_store: ms,
         remotes,
-        sessions: Arc::new(Sessions::new()),
+        sessions: Arc::new(Sessions::with_secure(config.server_tls_identity.is_some())),
     });
 
     let exe_path = std::env::current_exe().expect("Expect to retrieve current exe path");
@@ -81,9 +89,11 @@ async fn main() -> std::io::Result<()> {
             .route("/login", actix_web::web::get().to(login_get))
             .route("/login", actix_web::web::post().to(login_post))
             .route("/logout", actix_web::web::get().to(logout_get))
+            .route("/ws/", actix_web::web::get().to(websocket_get))
             .service(actix_files::Files::new("/static", web_static_path.clone())
                      .use_last_modified(true)
-                     .show_files_listing())
+                     .show_files_listing()
+                     .disable_content_disposition())
     });
 
     match config.server_tls_identity {
@@ -153,7 +163,7 @@ struct IndexTemplate {
 async fn index(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
 ) -> actix_web::Result<impl Responder> {
     // If not logged in, redirect to "/login".
-    let session = ctx.sessions.get(&req);
+    let session = ctx.sessions.get_with_req(&req);
     if session.is_none() {
         let mut res = HttpResponse::SeeOther(); // 303
         res.header(actix_web::http::header::LOCATION, "/login");
@@ -193,12 +203,13 @@ struct LoginPostArgs {
 
 async fn login_post(
     ctx: actix_web::web::Data<AppContext>,
-    _req: HttpRequest,
+    req: HttpRequest,
     form: actix_web::web::Form<LoginPostArgs>,
 ) -> actix_web::Result<impl Responder> {
     let auth_token = ctx.auth.login(&form.username, &form.password);
 
     if auth_token.is_some() {
+        info!("peer={:?} Logged in", req.peer_addr());
         let mut res = HttpResponse::SeeOther(); // 303
         if let Err(e) = ctx.sessions.login(&mut res) {
             error!("Error calling Sessions::login: {}", e);
@@ -208,6 +219,8 @@ async fn login_post(
         Ok(res.finish())
     } else {
         assert!(auth_token.is_none());
+
+        info!("peer={:?} Bad username or password", req.peer_addr());
 
         let mut res = HttpResponse::Unauthorized(); // 401
         res.content_type("text/html");
@@ -226,6 +239,98 @@ async fn logout_get(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
     let res = res.body((LoginTemplate { message: Some("Logged out") })
                            .render().unwrap());
     Ok(res)
+}
+
+struct WebSocketActor {
+    ctx: AppContext,
+    peer_addr: std::net::SocketAddr,
+}
+
+impl actix::Actor for WebSocketActor {
+    type Context = ws::WebsocketContext<Self>;
+}
+
+impl actix::StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketActor {
+    fn handle(
+        &mut self,
+        msg: Result<ws::Message, ws::ProtocolError>,
+        ctx: &mut Self::Context,
+    ) {
+        let log_ctx = format!("WSA peer={}", self.peer_addr);
+        match msg {
+            Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
+            Ok(ws::Message::Binary(bin)) => {
+                let msg = match web_socket_types::ToServer::decode(&*bin) {
+                    Err(e) => {
+                        warn!("{} Decode error: {}", log_ctx, e);
+                        return;
+                    },
+                    Ok(msg) => msg,
+                };
+                self.handle_incoming(msg, ctx);
+            },
+            Ok(ws::Message::Close(reason)) => {
+                info!("{} Closed reason={:?}", log_ctx, reason);
+            },
+            Ok(ws::Message::Text(_)) => warn!("{} Unexpected text message", log_ctx),
+            Ok(_) => {},
+            Err(e) => {
+                warn!("{} Error: {}", log_ctx, e)
+            }
+        }
+    }
+}
+
+impl WebSocketActor {
+    fn handle_incoming(
+        &mut self,
+        msg: web_socket_types::ToServer,
+        ctx: &mut ws::WebsocketContext<Self>,
+    ) {
+        let log_ctx = format!("WSA peer={}", self.peer_addr);
+        trace!("{} Incoming={:?}", log_ctx, &msg);
+        let msg = match msg.msg {
+            Some(msg) => msg,
+            None => {
+                error!("{} Missing ToServer.msg", log_ctx);
+                return;
+            }
+        };
+
+        match msg {
+            web_socket_types::to_server::Msg::AuthReq(req) => {
+                let sess = self.ctx.sessions.get_with_key(&req.key);
+                info!("{} AuthReq sess={:?}", log_ctx, sess.is_some());
+                let resp = web_socket_types::ToClient {
+                    msg: Some(web_socket_types::to_client::Msg::AuthResp(
+                        web_socket_types::AuthenticateResponse {
+                            ok: sess.is_some(),
+                        }
+                    )),
+                };
+                let mut buf = vec![];
+                if let Err(e) = resp.encode(&mut buf) {
+                    error!("{} AuthResp encode error: {}", log_ctx, e);
+                    return;
+                }
+                ctx.binary(buf);
+            }
+        }
+    }
+}
+
+async fn websocket_get(
+    ctx: actix_web::web::Data<AppContext>,
+    req: HttpRequest,
+    stream: actix_web::web::Payload
+) -> Result<HttpResponse, actix_web::Error> {
+    let peer_addr = req.peer_addr().unwrap();
+    info!("Starting websocket connection, remote={:?}", peer_addr);
+    let resp = ws::start(WebSocketActor {
+        ctx: (**ctx).clone(),
+        peer_addr,
+    }, &req, stream);
+    resp
 }
 
 fn load_cert_chain(filename: &str) -> Vec<rustls::Certificate> {

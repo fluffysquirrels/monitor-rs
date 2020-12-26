@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -eux;
+
+# Compute package directory.
+readonly package_dir="$( cd $(dirname ${BASH_SOURCE})/..; pwd )";
+
+cd "${package_dir}";
+
+bin/build-web;
+
+cargo run --release --package web;
