@@ -1,12 +1,11 @@
 use crate::{
-    chrono_datetime_from_protobuf,
-    chrono_datetime_to_protobuf,
-    collector,
     DataPoint,
     MetricKey,
     MetricValue,
+    monitor_core_types,
     OkErr,
     Signal,
+    time_utils,
 };
 use std::collections::BTreeMap;
 
@@ -123,7 +122,7 @@ impl MetricState {
 }
 
 impl Metric {
-    pub fn from_protobuf(metric: &collector::Metric) -> Result<Metric, String> {
+    pub fn from_protobuf(metric: &monitor_core_types::Metric) -> Result<Metric, String> {
         let rv = Metric {
             latest: match &metric.latest {
                 None => None,
@@ -131,14 +130,14 @@ impl Metric {
                     let val = dp.value.as_ref()
                                 .ok_or_else(|| "protobuf DataPoint missing .value".to_owned())?;
                     Some(DataPoint {
-                        time: chrono_datetime_from_protobuf(
+                        time: time_utils::chrono_datetime_from_protobuf(
                             dp.time.as_ref()
                                 .ok_or_else(|| "protobuf DataPoint missing .time"
                                             .to_owned())?)?,
                         val: match val {
-                            collector::data_point::Value::None(_) => MetricValue::None,
-                            collector::data_point::Value::I64(x)  => MetricValue::I64(*x),
-                            collector::data_point::Value::F64(x)  => MetricValue::F64(*x),
+                            monitor_core_types::data_point::Value::None(_) => MetricValue::None,
+                            monitor_core_types::data_point::Value::I64(x)  => MetricValue::I64(*x),
+                            monitor_core_types::data_point::Value::F64(x)  => MetricValue::F64(*x),
                         },
                         ok: match dp.ok {
                             true => OkErr::Ok,
@@ -155,18 +154,19 @@ impl Metric {
         Ok(rv)
     }
 
-    pub fn to_protobuf(&self) -> Result<collector::Metric, String> {
-        Ok(collector::Metric {
+    pub fn to_protobuf(&self) -> Result<monitor_core_types::Metric, String> {
+        Ok(monitor_core_types::Metric {
             key: Some(self.key.to_protobuf()?),
             latest: match self.latest.as_ref() {
                 None => None,
-                Some(dp) => Some(collector::DataPoint {
-                    time: Some(chrono_datetime_to_protobuf(&dp.time)?),
+                Some(dp) => Some(monitor_core_types::DataPoint {
+                    time: Some(time_utils::chrono_datetime_to_protobuf(&dp.time)?),
                     value: Some(match &dp.val {
                         MetricValue::None =>
-                            collector::data_point::Value::None(collector::None {}),
-                        MetricValue::I64(x) => collector::data_point::Value::I64(*x),
-                        MetricValue::F64(x) => collector::data_point::Value::F64(*x),
+                            monitor_core_types::data_point::Value::None(
+                                monitor_core_types::None {}),
+                        MetricValue::I64(x) => monitor_core_types::data_point::Value::I64(*x),
+                        MetricValue::F64(x) => monitor_core_types::data_point::Value::F64(*x),
                     }),
                     ok: match &dp.ok {
                         OkErr::Ok => true,

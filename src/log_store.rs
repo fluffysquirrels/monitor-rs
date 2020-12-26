@@ -1,11 +1,8 @@
 use crate::{
-    chrono_datetime_from_protobuf,
-    chrono_datetime_to_protobuf,
-    collector,
     MetricKey,
+    monitor_core_types,
     Signal,
-    std_time_duration_from_protobuf,
-    std_time_duration_to_protobuf,
+    time_utils,
 };
 use std::collections::BTreeMap;
 
@@ -57,25 +54,25 @@ impl Default for LogStore {
 }
 
 impl Log {
-    pub fn to_protobuf(&self) -> Result<collector::Log, String> {
-        Ok(collector::Log {
-            start: Some(chrono_datetime_to_protobuf(&self.start)?),
-            finish: Some(chrono_datetime_to_protobuf(&self.finish)?),
-            duration: Some(std_time_duration_to_protobuf(&self.duration)?),
+    pub fn to_protobuf(&self) -> Result<monitor_core_types::Log, String> {
+        Ok(monitor_core_types::Log {
+            start: Some(time_utils::chrono_datetime_to_protobuf(&self.start)?),
+            finish: Some(time_utils::chrono_datetime_to_protobuf(&self.finish)?),
+            duration: Some(time_utils::std_time_duration_to_protobuf(&self.duration)?),
             log: self.log.clone(),
             key: Some(self.key.to_protobuf()?),
         })
     }
 
-    pub fn from_protobuf(l: &collector::Log) -> Result<Log, String> {
+    pub fn from_protobuf(l: &monitor_core_types::Log) -> Result<Log, String> {
         let rv = Log {
-            start: chrono_datetime_from_protobuf(
+            start: time_utils::chrono_datetime_from_protobuf(
                        l.start.as_ref()
                         .ok_or_else(|| "protobuf Log missing .start".to_owned())?)?,
-            finish: chrono_datetime_from_protobuf(
+            finish: time_utils::chrono_datetime_from_protobuf(
                        l.finish.as_ref()
                         .ok_or_else(|| "protobuf Log missing .finish".to_owned())?)?,
-            duration: std_time_duration_from_protobuf(
+            duration: time_utils::std_time_duration_from_protobuf(
                           l.duration.as_ref()
                            .ok_or_else(|| "protobuf Log missing .duration".to_owned())?)?,
             log: l.log.clone(),

@@ -12,6 +12,7 @@ use monitor::{
     log_store::{self, LogStore},
     MetricKey,
     metric_store::{self, MetricStore},
+    monitor_core_types,
     RemoteHost,
     scheduler::Scheduler,
 };
@@ -106,7 +107,7 @@ impl collector_server::Collector for CollectorService {
                        "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
         let metrics = self.metric_store.lock().unwrap().query_all();
         let metrics = metrics.iter().map(|m| metric_to_remote(m, &self.config))
-                             .collect::<Result<Vec<collector::Metric>, String>>();
+                             .collect::<Result<Vec<monitor_core_types::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics to_protobuf error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
@@ -119,7 +120,7 @@ impl collector_server::Collector for CollectorService {
     }
 
     type StreamMetricsStream =
-        tokio::sync::mpsc::Receiver<Result<collector::Metric, tonic::Status>>;
+        tokio::sync::mpsc::Receiver<Result<monitor_core_types::Metric, tonic::Status>>;
     async fn stream_metrics(
         &self,
         request: tonic::Request<collector::StreamMetricsRequest>,
@@ -132,14 +133,14 @@ impl collector_server::Collector for CollectorService {
         let mut lock = self.metric_store.lock().unwrap();
         let metrics = lock.query_all()
                           .iter().map(|m| metric_to_remote(m, &self.config))
-                          .collect::<Result<Vec<collector::Metric>, String>>();
+                          .collect::<Result<Vec<monitor_core_types::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics metric_to_remote error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
         }
         let metrics = metrics.unwrap();
         let (mut tx, rx) =
-            tokio::sync::mpsc::channel::<Result<collector::Metric, tonic::Status>>(
+            tokio::sync::mpsc::channel::<Result<monitor_core_types::Metric, tonic::Status>>(
                 metrics.len() + 10);
         for m in metrics.into_iter() {
             trace!("stream_metrics: Sending initial value '{:?}'", &m);
@@ -175,7 +176,7 @@ impl collector_server::Collector for CollectorService {
     }
 
     type StreamLogsStream =
-        tokio::sync::mpsc::Receiver<Result<collector::Log, tonic::Status>>;
+        tokio::sync::mpsc::Receiver<Result<monitor_core_types::Log, tonic::Status>>;
     async fn stream_logs(
         &self,
         request: tonic::Request<collector::StreamLogsRequest>,
@@ -188,7 +189,7 @@ impl collector_server::Collector for CollectorService {
         let mut lock = self.log_store.lock().unwrap();
         let logs = lock.query_all()
                        .map(|l| log_to_remote(l, &self.config))
-                       .collect::<Result<Vec<collector::Log>, String>>();
+                       .collect::<Result<Vec<monitor_core_types::Log>, String>>();
         if let Err(e) = logs {
             error!("logs to_protobuf error: {}", e);
             return Err(tonic::Status::internal("Internal error."));
@@ -244,14 +245,14 @@ impl collector_server::Collector for CollectorService {
 }
 
 fn metric_to_remote(m: &metric_store::Metric, config: &config::Collector
-) -> Result<collector::Metric, String> {
+) -> Result<monitor_core_types::Metric, String> {
     let mut remote = m.clone();
     remote.key = metric_key_to_remote(&m.key, config)?;
     remote.to_protobuf()
 }
 
 fn log_to_remote(l: &log_store::Log, config: &config::Collector
-) -> Result<collector::Log, String> {
+) -> Result<monitor_core_types::Log, String> {
     let mut remote = l.clone();
     remote.key = metric_key_to_remote(&l.key, config)?;
     remote.to_protobuf()

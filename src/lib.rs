@@ -10,11 +10,18 @@ mod notifier;
 pub mod remote;
 pub mod scheduler;
 mod signal;
+mod time_utils;
 
 pub mod collector {
     //! Protobuf types for the Collector service
 
     tonic::include_proto!("collector");
+}
+
+pub mod monitor_core_types {
+    //! Core Protobuf types
+
+    tonic::include_proto!("monitor_core_types");
 }
 
 pub use crate::{
@@ -27,7 +34,6 @@ pub use crate::{
     signal::{Continue, Signal},
 };
 
-use chrono::TimeZone;
 use process_control::{ChildExt, Timeout};
 use std::sync::{Arc, Mutex};
 
@@ -328,34 +334,4 @@ pub fn force_check(mk: &MetricKey, remotes: &Arc<remote::Remotes>, sched: &Arc<M
             remote::force_check_remote(mk, remotes);
         }
     }
-}
-
-fn chrono_datetime_from_protobuf(t: &collector::Time
-) -> Result<chrono::DateTime<chrono::Utc>, String> {
-    let epoch = chrono::Utc.ymd(1970, 1, 1).and_hms(0, 0, 0);
-    Ok(epoch
-       + chrono::Duration::milliseconds(t.epoch_millis)
-       + chrono::Duration::nanoseconds(t.nanos as i64)
-    )
-}
-
-fn chrono_datetime_to_protobuf(t: &chrono::DateTime<chrono::Utc>
-) -> Result<collector::Time, String> {
-    Ok(collector::Time {
-        epoch_millis: t.timestamp_millis(),
-        nanos: t.timestamp_subsec_nanos() % 1_000_000,
-    })
-}
-
-fn std_time_duration_from_protobuf(d: &collector::Duration
-) -> Result<std::time::Duration, String> {
-    Ok(std::time::Duration::new(d.secs, d.nanos))
-}
-
-fn std_time_duration_to_protobuf(d: &std::time::Duration
-) -> Result<collector::Duration, String> {
-    Ok(collector::Duration {
-        secs: d.as_secs(),
-        nanos: d.subsec_nanos(),
-    })
 }

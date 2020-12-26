@@ -1,4 +1,4 @@
-use crate::collector;
+use crate::monitor_core_types;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OkErr {
@@ -40,10 +40,10 @@ impl MetricKey {
                 })
     }
 
-    pub fn to_protobuf(&self) -> Result<collector::MetricKey, String> {
-        Ok(collector::MetricKey {
+    pub fn to_protobuf(&self) -> Result<monitor_core_types::MetricKey, String> {
+        Ok(monitor_core_types::MetricKey {
             name: self.name.clone(),
-            from_host: Some(collector::Host {
+            from_host: Some(monitor_core_types::Host {
                 name: match &self.host {
                     Host::Local =>
                         return Err("Missing hostname in MetricKey::to_protobuf".to_owned()),
@@ -53,7 +53,7 @@ impl MetricKey {
         })
     }
 
-    pub fn from_protobuf(p: &collector::MetricKey) -> Result<MetricKey, String> {
+    pub fn from_protobuf(p: &monitor_core_types::MetricKey) -> Result<MetricKey, String> {
         let rv = MetricKey {
             name: p.name.clone(),
             host: Host::Remote(RemoteHost {

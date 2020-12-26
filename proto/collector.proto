@@ -1,18 +1,20 @@
 syntax = "proto3";
 
+import "monitor_core_types.proto";
+
 package collector;
 
 service Collector {
   rpc GetMetrics (GetMetricsRequest) returns (MetricsReply) {}
-  rpc StreamMetrics (StreamMetricsRequest) returns (stream Metric) {}
-  rpc StreamLogs (StreamLogsRequest) returns (stream Log) {}
+  rpc StreamMetrics (StreamMetricsRequest) returns (stream monitor_core_types.Metric) {}
+  rpc StreamLogs (StreamLogsRequest) returns (stream monitor_core_types.Log) {}
   rpc ForceRun (ForceRunRequest) returns (ForceRunReply) {}
 }
 
 message GetMetricsRequest {}
 
 message MetricsReply {
-  repeated Metric metrics = 1;
+  repeated monitor_core_types.Metric metrics = 1;
 }
 
 message StreamMetricsRequest {}
@@ -24,51 +26,3 @@ message ForceRunRequest {
 }
 
 message ForceRunReply {}
-
-message Metric {
-  reserved 1, 2;
-
-  MetricKey key = 4;
-  DataPoint latest = 3;
-}
-
-message DataPoint {
-  reserved 2;
-
-  Time time = 1;
-  oneof value {
-    int64 i64 = 3;
-    double f64 = 4;
-    None none = 6;
-  }
-  bool ok = 5;
-}
-
-message Log {
-  Time start = 1;
-  Time finish = 2;
-  Duration duration = 3;
-  string log = 4;
-  MetricKey key = 5;
-}
-
-message MetricKey {
-  string name = 1;
-  Host from_host = 2;
-}
-
-message Host {
-  string name = 1;
-}
-
-message Time {
-  sfixed64 epoch_millis = 1;
-  fixed32 nanos = 2;
-}
-
-message Duration {
-  fixed64 secs = 1;
-  fixed32 nanos = 2;
-}
-
-message None {}

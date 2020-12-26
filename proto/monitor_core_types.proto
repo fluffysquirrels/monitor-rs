@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package monitor_core_types;
+
+message Metric {
+  reserved 1, 2;
+
+  MetricKey key = 4;
+  DataPoint latest = 3;
+}
+
+message DataPoint {
+  reserved 2;
+
+  Time time = 1;
+  oneof value {
+    int64 i64 = 3;
+    double f64 = 4;
+    None none = 6;
+  }
+  bool ok = 5;
+}
+
+message Log {
+  Time start = 1;
+  Time finish = 2;
+  Duration duration = 3;
+  string log = 4;
+  MetricKey key = 5;
+}
+
+message MetricKey {
+  string name = 1;
+  Host from_host = 2;
+}
+
+message Host {
+  string name = 1;
+}
+
+message Time {
+  sfixed64 epoch_millis = 1;
+  fixed32 nanos = 2;
+}
+
+message Duration {
+  fixed64 secs = 1;
+  fixed32 nanos = 2;
+}
+
+message None {}
