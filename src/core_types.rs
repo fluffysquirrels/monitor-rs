@@ -1,4 +1,7 @@
-use crate::monitor_core_types;
+use crate::{
+    config,
+    monitor_core_types
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum OkErr {
@@ -38,6 +41,18 @@ impl MetricKey {
                     Host::Local => "local",
                     Host::Remote(RemoteHost { name: hostname }) => &hostname,
                 })
+    }
+
+    pub fn to_remote(&self, host_name: &config::Hostname) -> Result<MetricKey, String> {
+        Ok(MetricKey {
+            name: self.name.clone(),
+            host: Host::Remote(RemoteHost {
+                name: match &self.host {
+                    Host::Local => host_name.clone(),
+                    Host::Remote(RemoteHost { name }) => name.clone(),
+                },
+            }),
+        })
     }
 
     pub fn to_protobuf(&self) -> Result<monitor_core_types::MetricKey, String> {

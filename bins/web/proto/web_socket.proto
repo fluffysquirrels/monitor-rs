@@ -1,23 +1,29 @@
 syntax = "proto3";
 
+import "monitor_core_types.proto";
+
 package monitor_web_socket;
 
+// ## ToServer and sub-types
 message ToServer {
+  reserved 1;
+
   oneof msg {
-    AuthenticateRequest auth_req = 1;
+    SubscribeToMetrics subscribeToMetrics = 2;
   }
 }
 
-message AuthenticateRequest {
-  string key = 1;
-}
+message SubscribeToMetrics {}
 
+// ## ToClient and sub-types
 message ToClient {
+  reserved 1;
+
   oneof msg {
-    AuthenticateResponse auth_resp = 1;
+    MetricUpdate metricUpdate = 2;
   }
 }
 
-message AuthenticateResponse {
-  bool ok = 1;
+message MetricUpdate {
+  monitor_core_types.Metric metric = 1;
 }

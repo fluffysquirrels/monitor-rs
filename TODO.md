@@ -4,20 +4,20 @@
 
 * Web front-end
     * Get metric updates over WebSocket
-        * Authenticate WebSocket
+        * Update UI.
+        * Fix race
 
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Lots of `unwrap()`s, `expect()`s that should return errors, use clippy.
+* Update race because WebSocket doesn't return initial values.
 
 ## Features
 
 * Web front-end
     * WebSocket
-        * Send protobuf encoded frames,
-          use [protobuf.js](https://www.npmjs.com/package/protobufjs)
+        * Ping frames from client
     * Notifications when page is open
     * Notifications when page is not open?
     * Authentication
@@ -69,6 +69,7 @@
 
 ## Improvements
 
+* Lots of `unwrap()`s, `expect()`s that should return errors, use clippy.
 * Sync jobs fail loudly on resume, would be nice to special case this
   like the scheduler sleep on resume.
 * Separate CA's for clients and servers; currently server certs can be used as sync client certs.

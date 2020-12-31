@@ -25,7 +25,6 @@ function startWs() {
         console.error("ws.onerror:", evt);
     };
     ws.onmessage = (evt) => {
-        console.log("ws.onmessage:", evt);
         const arrayBuffer = evt.data;
         const view = new Uint8Array(arrayBuffer);
         const mws = protobuf.roots["default"].monitor_web_socket;
@@ -36,19 +35,18 @@ function startWs() {
             console.error("ws ToClient.decode error:", e);
             return;
         }
-        console.log("ws ToClient.decode =", decode);
-        if (decode.authResp) {
-            console.log("ws authResp ok =", decode.authResp.ok);
+        console.debug("ws ToClient.decode =", decode);
+        if (decode.metricUpdate) {
+            const m = decode.metricUpdate;
+            console.log("ws metricUpdate key =", m.metric.key);
         }
     };
     ws.onopen = (evt) => {
         console.log("ws.onopen:", evt);
         const mws = protobuf.roots["default"].monitor_web_socket;
-        // TODO: Get the real key.
-        const authReq = mws.AuthenticateRequest.create({ key: "foo" });
-        const req = mws.ToServer.create({ authReq: authReq });
+        const subReq = mws.SubscribeToMetrics.create();
+        const req = mws.ToServer.create({ subscribeToMetrics: subReq });
         const buf = mws.ToServer.encode(req).finish();
-        console.log("auth buf:", buf);
         ws.send(buf);
     };
 }

@@ -9,6 +9,8 @@ cd "${package_dir}";
 cargo build --release --package web;
 
 bins/web/third-party/protobuf.js-6.10.2/bin/pbjs \
-    -t static-module -w closure \
-    bins/web/proto/web_socket.proto \
-    -o bins/web/static/monitor_web_socket.js;
+    --target static-module \
+    --wrap closure \
+    --out bins/web/static/monitor_web_socket.js \
+    --path proto/ \
+    bins/web/proto/web_socket.proto;

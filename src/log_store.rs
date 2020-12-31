@@ -1,4 +1,5 @@
 use crate::{
+    config,
     MetricKey,
     monitor_core_types,
     Signal,
@@ -54,6 +55,13 @@ impl Default for LogStore {
 }
 
 impl Log {
+    pub fn to_remote(&self, host_name: &config::Hostname
+    ) -> Result<monitor_core_types::Log, String> {
+        let mut remote = self.clone();
+        remote.key = self.key.to_remote(host_name)?;
+        remote.to_protobuf()
+    }
+
     pub fn to_protobuf(&self) -> Result<monitor_core_types::Log, String> {
         Ok(monitor_core_types::Log {
             start: Some(time_utils::chrono_datetime_to_protobuf(&self.start)?),

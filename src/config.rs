@@ -1,9 +1,11 @@
 use crate::{BoxError, Host, MetricKey, OkErr, RemoteHost};
 use serde::{Serialize, Deserialize};
 
+pub type Hostname = String;
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Collector {
-    pub host_name: String,
+    pub host_name: Hostname,
     pub listen_addr: String,
     pub shell_checks: Vec<ShellCheck>,
     pub shell_metrics: Vec<ShellMetric>,
@@ -21,6 +23,7 @@ pub struct GtkClient {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Web {
+    pub host_name: Hostname,
     pub listen_addr: String,
     pub remote_syncs: Vec<RemoteSync>,
     pub server_tls_identity: Option<TlsIdentity>,

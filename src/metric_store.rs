@@ -1,4 +1,5 @@
 use crate::{
+    config,
     DataPoint,
     MetricKey,
     MetricValue,
@@ -122,6 +123,13 @@ impl MetricState {
 }
 
 impl Metric {
+    pub fn to_remote(&self, host_name: &config::Hostname
+    ) -> Result<monitor_core_types::Metric, String> {
+        let mut remote = self.clone();
+        remote.key = self.key.to_remote(host_name)?;
+        remote.to_protobuf()
+    }
+
     pub fn from_protobuf(metric: &monitor_core_types::Metric) -> Result<Metric, String> {
         let rv = Metric {
             latest: match &metric.latest {

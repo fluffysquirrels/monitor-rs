@@ -8,12 +8,10 @@ use monitor::{
     Continue,
     create_shell_checks,
     create_shell_metrics,
-    Host,
-    log_store::{self, LogStore},
+    log_store::LogStore,
     MetricKey,
-    metric_store::{self, MetricStore},
+    metric_store::MetricStore,
     monitor_core_types,
-    RemoteHost,
     scheduler::Scheduler,
 };
 use std::sync::{Arc, Mutex};
@@ -106,7 +104,7 @@ impl collector_server::Collector for CollectorService {
         trace!(concat!("CollectorService::get_metrics\n",
                        "request remote_addr={:?}, \n  {:#?}"), request.remote_addr(), request);
         let metrics = self.metric_store.lock().unwrap().query_all();
-        let metrics = metrics.iter().map(|m| metric_to_remote(m, &self.config))
+        let metrics = metrics.iter().map(|m| m.to_remote(&self.config.host_name))
                              .collect::<Result<Vec<monitor_core_types::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics to_protobuf error: {}", e);
@@ -132,7 +130,7 @@ impl collector_server::Collector for CollectorService {
         // Lock the metric store until we've sent all initial values and registered our listener
         let mut lock = self.metric_store.lock().unwrap();
         let metrics = lock.query_all()
-                          .iter().map(|m| metric_to_remote(m, &self.config))
+                          .iter().map(|m| m.to_remote(&self.config.host_name))
                           .collect::<Result<Vec<monitor_core_types::Metric>, String>>();
         if let Err(e) = metrics {
             error!("metrics metric_to_remote error: {}", e);
@@ -152,7 +150,7 @@ impl collector_server::Collector for CollectorService {
         let tx = Mutex::new(tx);
         let config = self.config.clone();
         lock.update_signal_for_all().connect(move |metric| {
-            let metric_proto = match metric_to_remote(&metric, &config) {
+            let metric_proto = match metric.to_remote(&config.host_name) {
                 Err(e) => {
                     error!("stream_metrics: failed to encode as protobuf: {}", e);
                     return Continue::Continue;
@@ -188,7 +186,7 @@ impl collector_server::Collector for CollectorService {
         // Lock the log store until we've sent all initial values and registered our listener
         let mut lock = self.log_store.lock().unwrap();
         let logs = lock.query_all()
-                       .map(|l| log_to_remote(l, &self.config))
+                       .map(|l| l.to_remote(&self.config.host_name))
                        .collect::<Result<Vec<monitor_core_types::Log>, String>>();
         if let Err(e) = logs {
             error!("logs to_protobuf error: {}", e);
@@ -205,7 +203,7 @@ impl collector_server::Collector for CollectorService {
         let tx = Mutex::new(tx);
         let config = self.config.clone();
         lock.update_signal().connect(move |log| {
-            let log_proto = match log_to_remote(&log, &config) {
+            let log_proto = match log.to_remote(&config.host_name) {
                 Err(e) => {
                     error!("stream_logs: failed to encode as protobuf: {}", e);
                     return Continue::Continue;
@@ -242,30 +240,4 @@ impl collector_server::Collector for CollectorService {
             Err(e) => Err(tonic::Status::internal(format!("Scheduler error: {}", e))),
         }
     }
-}
-
-fn metric_to_remote(m: &metric_store::Metric, config: &config::Collector
-) -> Result<monitor_core_types::Metric, String> {
-    let mut remote = m.clone();
-    remote.key = metric_key_to_remote(&m.key, config)?;
-    remote.to_protobuf()
-}
-
-fn log_to_remote(l: &log_store::Log, config: &config::Collector
-) -> Result<monitor_core_types::Log, String> {
-    let mut remote = l.clone();
-    remote.key = metric_key_to_remote(&l.key, config)?;
-    remote.to_protobuf()
-}
-
-fn metric_key_to_remote(mk: &MetricKey, config: &config::Collector) -> Result<MetricKey, String> {
-    Ok(MetricKey {
-        name: mk.name.clone(),
-        host: Host::Remote(RemoteHost {
-            name: match &mk.host {
-                Host::Local => config.host_name.clone(),
-                Host::Remote(RemoteHost { name }) => name.clone(),
-            },
-        }),
-    })
 }
