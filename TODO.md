@@ -5,13 +5,13 @@
 * Web front-end
     * Get metric updates over WebSocket
         * Update UI.
-        * Fix race
+        * Fix update race because WebSocket doesn't return initial values.
 
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Update race because WebSocket doesn't return initial values.
+* Fix update race because WebSocket doesn't return initial values.
 
 ## Features
 
@@ -28,7 +28,6 @@
             * This is a big old memory leak right now. Enforce one session per user?
         * Refresh sessions near their expiry? (50% towards expiry?)
     * Anti-CSRF
-    * External stylesheet
     * Show check results
         * Start with statically rendered HTML
         * Then JS rendered from JSON injected into the page
@@ -69,6 +68,7 @@
 
 ## Improvements
 
+* Random exponential backoff for connection retries.
 * Lots of `unwrap()`s, `expect()`s that should return errors, use clippy.
 * Sync jobs fail loudly on resume, would be nice to special case this
   like the scheduler sleep on resume.
