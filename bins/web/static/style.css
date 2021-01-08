@@ -1,3 +1,7 @@
+.metric-value {
+    padding-right: 0.25em;
+}
+
 .metric-value-missing {
     color: #cc0000;
 }

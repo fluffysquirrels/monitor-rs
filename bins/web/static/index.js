@@ -1,6 +1,8 @@
+import * as Vue from "/static/third-party/vue.esm-browser.js";
+
 function indexMain() {
-    console.log("indexMain");
     startWs();
+    vueStart();
 }
 
 let ws = null;
@@ -38,7 +40,32 @@ function startWs() {
         console.debug("ws ToClient.decode =", decode);
         if (decode.metricUpdate) {
             const m = decode.metricUpdate;
-            console.log("ws metricUpdate key =", m.metric.key);
+            console.debug("ws metricUpdate key =", m.metric.key);
+            if (va) {
+                const displayKey = m.metric.key.name + "@" + m.metric.key.fromHost.name;
+                let displayValue = null;
+                if (m.metric.latest.none) {
+                    displayValue = m.metric.latest.ok ? "Ok": "Err";
+                } else if (m.metric.latest.i64 !== undefined) {
+                    displayValue = m.metric.latest.i64.toString();
+                } else if (m.metric.latest.f64 !== undefined) {
+                    displayValue = m.metric.latest.f64.toString();
+                }
+
+                const o = {
+                    metricKey: displayKey,
+                    ok: m.metric.latest.ok,
+                    value: displayValue,
+                };
+
+                const existing = va.metrics.find(vm => vm.metricKey === displayKey);
+                if (existing) {
+                    existing.ok = o.ok;
+                    existing.value = o.value;
+                } else {
+                    va.metrics.push(o);
+                }
+            }
         }
     };
     ws.onopen = (evt) => {
@@ -51,5 +78,20 @@ function startWs() {
     };
 }
 
-console.log("index.js loaded");
+let va = null;
+
+function vueStart() {
+    const app = {
+        data() {
+            return {
+                metrics: [],
+            };
+        }
+    };
+
+    va = Vue.createApp(app).mount("#app");
+    document.getElementById("app").style.display = "block";
+    document.getElementById("pre-app").remove();
+}
+
 indexMain();

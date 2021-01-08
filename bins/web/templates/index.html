@@ -7,20 +7,33 @@
 {% endblock %}
 
 {% block main %}
-    <h1>Metrics</h1>
-    <div>
-      {% for metric in metrics %}
-      <div class="metric">
-        {% match metric.latest %}
+    <div id="pre-app">
+      <h1>Metrics</h1>
+      <div>
+        {% for metric in metrics %}
+        <div class="metric">
+          {% match metric.latest %}
           {% when Some with (dp) %}
-            <span class="metric-value metric-value-{{ dp.ok.to_string() }}">
-              {{ dp.value_string()|e }}
-            </span>
+          <span class="metric-value metric-value-{{ dp.ok.to_string() }}">
+            {{ dp.value_string()|e }}
+          </span>
           {% when None %}
-            <span class="metric-value metric-value-missing">?</span>
-        {% endmatch %}
-        <span class="metric-name">{{ metric.key.display_name()|e }}</span>
+          <span class="metric-value metric-value-missing">?</span>
+          {% endmatch %}
+          <span class="metric-name">{{ metric.key.display_name()|e }}</span>
+        </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+    </div>
+
+    <div id="app" style="display: none">
+      <h1>Metrics</h1>
+      <div>
+        <div v-for="metric in metrics" v-bind:key="metric.metricKey" class="metric">
+          <span v-bind:class="['metric-value', 'metric-value-' + (metric.ok ? 'Ok' : 'Err')]"
+                v-text="metric.value"></span>
+          <span class="metric-name" v-text="metric.metricKey"></span>
+        </div>
+      </div>
     </div>
 {% endblock %}
