@@ -5,7 +5,6 @@
 * Web front-end
     * Get metric updates over WebSocket
         * Fix update race because WebSocket doesn't return initial values.
-        * Retry connection on failure.
 
 ## Bugs
 
@@ -18,7 +17,6 @@
 * Web front-end
     * WebSocket
         * Ping frames from client
-        * Retry connection on failure.
     * Notifications when page is open
     * Notifications when page is not open?
     * Authentication

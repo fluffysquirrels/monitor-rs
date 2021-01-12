@@ -22,6 +22,9 @@ function startWs() {
     ws.onclose = (evt) => {
         console.error("ws.onclose:", evt);
         ws = null;
+        setTimeout(() => {
+            startWs();
+        }, 5000 /* ms */);
     };
     ws.onerror = (evt) => {
         console.error("ws.onerror:", evt);
@@ -58,6 +61,7 @@ function startWs() {
                     value: displayValue,
                 };
 
+                // TODO: Would be nice if this were O(1) somehow using a map.
                 const existing = va.metrics.find(vm => vm.metricKey === displayKey);
                 if (existing) {
                     existing.ok = o.ok;
