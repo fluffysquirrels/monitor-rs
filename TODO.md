@@ -4,8 +4,8 @@
 
 * Web front-end
     * Get metric updates over WebSocket
-        * Update UI.
         * Fix update race because WebSocket doesn't return initial values.
+        * Retry connection on failure.
 
 ## Bugs
 
@@ -18,6 +18,7 @@
 * Web front-end
     * WebSocket
         * Ping frames from client
+        * Retry connection on failure.
     * Notifications when page is open
     * Notifications when page is not open?
     * Authentication
@@ -68,7 +69,8 @@
 
 ## Improvements
 
-* Random exponential backoff for connection retries.
+* monitor gtk-client: Random exponential backoff for connection retries.
+* monitor web: Random exponential backoff for connection retries.
 * Lots of `unwrap()`s, `expect()`s that should return errors, use clippy.
 * Sync jobs fail loudly on resume, would be nice to special case this
   like the scheduler sleep on resume.
