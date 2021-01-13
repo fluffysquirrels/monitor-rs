@@ -11,8 +11,6 @@ mod web_socket_types {
     tonic::include_proto!("monitor_web_socket");
 }
 
-use actix_web::{HttpRequest, HttpResponse, Responder};
-use askama::Template;
 use crate::{
     auth::Auth,
     session::Sessions,
@@ -20,8 +18,8 @@ use crate::{
 use monitor::{
     // BoxError,
     config,
-    log_store::{LogStore},
-    metric_store::{Metric, MetricStore},
+    log_store::LogStore,
+    metric_store::MetricStore,
     remote,
 };
 use std::{
@@ -83,7 +81,7 @@ async fn main() -> std::io::Result<()> {
                     .handler(actix_web::http::StatusCode::NOT_FOUND, render_404),
             )
             .app_data(ctx.clone())
-            .route("/", actix_web::web::get().to(index))
+            .route("/", actix_web::web::get().to(handlers::metrics::metrics_get))
             .route("/login", actix_web::web::get().to(handlers::auth::login_get))
             .route("/login", actix_web::web::post().to(handlers::auth::login_post))
             .route("/logout", actix_web::web::get().to(handlers::auth::logout_get))
@@ -150,32 +148,6 @@ fn render_500<B>(mut res: actix_web::dev::ServiceResponse<B>
                      actix_web::dev::Body::Bytes(
                          actix_web::web::Bytes::from("Internal server error"))));
     Ok(actix_web::middleware::errhandlers::ErrorHandlerResponse::Response(res))
-}
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct IndexTemplate {
-    metrics: Vec<Metric>,
-}
-
-async fn index(ctx: actix_web::web::Data<AppContext>, req: HttpRequest
-) -> actix_web::Result<impl Responder> {
-    // If not logged in, redirect to "/login".
-    let session = ctx.sessions.get_with_req(&req);
-    if session.is_none() {
-        let mut res = HttpResponse::SeeOther(); // 303
-        res.header(actix_web::http::header::LOCATION, "/login");
-        return Ok(res.finish())
-    }
-
-    // Authenticated.
-    let metrics = ctx.metric_store.lock().unwrap().query_all();
-    let mut res = HttpResponse::Ok();
-    res.content_type("text/html");
-    let res = res.body((IndexTemplate {
-        metrics,
-    }).render().unwrap());
-    Ok(res)
 }
 
 fn load_cert_chain(filename: &str) -> Vec<rustls::Certificate> {
