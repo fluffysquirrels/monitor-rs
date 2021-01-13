@@ -10,14 +10,12 @@
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Fix update race because WebSocket doesn't return initial values.
+* monitor web: Fix update race because WebSocket doesn't return initial values.
 * Redirect to login when WebSocket auth fails.
 
 ## Features
 
 * Web front-end
-    * WebSocket
-        * Ping messages from client
     * Notifications when page is open
     * Notifications when page is not open?
     * Authentication

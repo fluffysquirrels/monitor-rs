@@ -24,6 +24,7 @@
              * @memberof monitor_web_socket
              * @interface IToServer
              * @property {monitor_web_socket.ISubscribeToMetrics|null} [subscribeToMetrics] ToServer subscribeToMetrics
+             * @property {monitor_web_socket.IPing|null} [ping] ToServer ping
              */
     
             /**
@@ -49,17 +50,25 @@
              */
             ToServer.prototype.subscribeToMetrics = null;
     
+            /**
+             * ToServer ping.
+             * @member {monitor_web_socket.IPing|null|undefined} ping
+             * @memberof monitor_web_socket.ToServer
+             * @instance
+             */
+            ToServer.prototype.ping = null;
+    
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
     
             /**
              * ToServer msg.
-             * @member {"subscribeToMetrics"|undefined} msg
+             * @member {"subscribeToMetrics"|"ping"|undefined} msg
              * @memberof monitor_web_socket.ToServer
              * @instance
              */
             Object.defineProperty(ToServer.prototype, "msg", {
-                get: $util.oneOfGetter($oneOfFields = ["subscribeToMetrics"]),
+                get: $util.oneOfGetter($oneOfFields = ["subscribeToMetrics", "ping"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
     
@@ -89,6 +98,8 @@
                     writer = $Writer.create();
                 if (message.subscribeToMetrics != null && Object.hasOwnProperty.call(message, "subscribeToMetrics"))
                     $root.monitor_web_socket.SubscribeToMetrics.encode(message.subscribeToMetrics, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                if (message.ping != null && Object.hasOwnProperty.call(message, "ping"))
+                    $root.monitor_web_socket.Ping.encode(message.ping, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 return writer;
             };
     
@@ -125,6 +136,9 @@
                     switch (tag >>> 3) {
                     case 2:
                         message.subscribeToMetrics = $root.monitor_web_socket.SubscribeToMetrics.decode(reader, reader.uint32());
+                        break;
+                    case 3:
+                        message.ping = $root.monitor_web_socket.Ping.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -170,6 +184,16 @@
                             return "subscribeToMetrics." + error;
                     }
                 }
+                if (message.ping != null && message.hasOwnProperty("ping")) {
+                    if (properties.msg === 1)
+                        return "msg: multiple values";
+                    properties.msg = 1;
+                    {
+                        var error = $root.monitor_web_socket.Ping.verify(message.ping);
+                        if (error)
+                            return "ping." + error;
+                    }
+                }
                 return null;
             };
     
@@ -189,6 +213,11 @@
                     if (typeof object.subscribeToMetrics !== "object")
                         throw TypeError(".monitor_web_socket.ToServer.subscribeToMetrics: object expected");
                     message.subscribeToMetrics = $root.monitor_web_socket.SubscribeToMetrics.fromObject(object.subscribeToMetrics);
+                }
+                if (object.ping != null) {
+                    if (typeof object.ping !== "object")
+                        throw TypeError(".monitor_web_socket.ToServer.ping: object expected");
+                    message.ping = $root.monitor_web_socket.Ping.fromObject(object.ping);
                 }
                 return message;
             };
@@ -210,6 +239,11 @@
                     object.subscribeToMetrics = $root.monitor_web_socket.SubscribeToMetrics.toObject(message.subscribeToMetrics, options);
                     if (options.oneofs)
                         object.msg = "subscribeToMetrics";
+                }
+                if (message.ping != null && message.hasOwnProperty("ping")) {
+                    object.ping = $root.monitor_web_socket.Ping.toObject(message.ping, options);
+                    if (options.oneofs)
+                        object.msg = "ping";
                 }
                 return object;
             };
@@ -388,6 +422,202 @@
             return SubscribeToMetrics;
         })();
     
+        monitor_web_socket.Ping = (function() {
+    
+            /**
+             * Properties of a Ping.
+             * @memberof monitor_web_socket
+             * @interface IPing
+             * @property {Uint8Array|null} [payload] Ping payload
+             */
+    
+            /**
+             * Constructs a new Ping.
+             * @memberof monitor_web_socket
+             * @classdesc Represents a Ping.
+             * @implements IPing
+             * @constructor
+             * @param {monitor_web_socket.IPing=} [properties] Properties to set
+             */
+            function Ping(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+    
+            /**
+             * Ping payload.
+             * @member {Uint8Array} payload
+             * @memberof monitor_web_socket.Ping
+             * @instance
+             */
+            Ping.prototype.payload = $util.newBuffer([]);
+    
+            /**
+             * Creates a new Ping instance using the specified properties.
+             * @function create
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {monitor_web_socket.IPing=} [properties] Properties to set
+             * @returns {monitor_web_socket.Ping} Ping instance
+             */
+            Ping.create = function create(properties) {
+                return new Ping(properties);
+            };
+    
+            /**
+             * Encodes the specified Ping message. Does not implicitly {@link monitor_web_socket.Ping.verify|verify} messages.
+             * @function encode
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {monitor_web_socket.IPing} message Ping message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Ping.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.payload != null && Object.hasOwnProperty.call(message, "payload"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.payload);
+                return writer;
+            };
+    
+            /**
+             * Encodes the specified Ping message, length delimited. Does not implicitly {@link monitor_web_socket.Ping.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {monitor_web_socket.IPing} message Ping message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Ping.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+    
+            /**
+             * Decodes a Ping message from the specified reader or buffer.
+             * @function decode
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {monitor_web_socket.Ping} Ping
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Ping.decode = function decode(reader, length) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.monitor_web_socket.Ping();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    switch (tag >>> 3) {
+                    case 1:
+                        message.payload = reader.bytes();
+                        break;
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Decodes a Ping message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {monitor_web_socket.Ping} Ping
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Ping.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+    
+            /**
+             * Verifies a Ping message.
+             * @function verify
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            Ping.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.payload != null && message.hasOwnProperty("payload"))
+                    if (!(message.payload && typeof message.payload.length === "number" || $util.isString(message.payload)))
+                        return "payload: buffer expected";
+                return null;
+            };
+    
+            /**
+             * Creates a Ping message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {monitor_web_socket.Ping} Ping
+             */
+            Ping.fromObject = function fromObject(object) {
+                if (object instanceof $root.monitor_web_socket.Ping)
+                    return object;
+                var message = new $root.monitor_web_socket.Ping();
+                if (object.payload != null)
+                    if (typeof object.payload === "string")
+                        $util.base64.decode(object.payload, message.payload = $util.newBuffer($util.base64.length(object.payload)), 0);
+                    else if (object.payload.length)
+                        message.payload = object.payload;
+                return message;
+            };
+    
+            /**
+             * Creates a plain object from a Ping message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof monitor_web_socket.Ping
+             * @static
+             * @param {monitor_web_socket.Ping} message Ping
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            Ping.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults)
+                    if (options.bytes === String)
+                        object.payload = "";
+                    else {
+                        object.payload = [];
+                        if (options.bytes !== Array)
+                            object.payload = $util.newBuffer(object.payload);
+                    }
+                if (message.payload != null && message.hasOwnProperty("payload"))
+                    object.payload = options.bytes === String ? $util.base64.encode(message.payload, 0, message.payload.length) : options.bytes === Array ? Array.prototype.slice.call(message.payload) : message.payload;
+                return object;
+            };
+    
+            /**
+             * Converts this Ping to JSON.
+             * @function toJSON
+             * @memberof monitor_web_socket.Ping
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            Ping.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+    
+            return Ping;
+        })();
+    
         monitor_web_socket.ToClient = (function() {
     
             /**
@@ -395,6 +625,7 @@
              * @memberof monitor_web_socket
              * @interface IToClient
              * @property {monitor_web_socket.IMetricUpdate|null} [metricUpdate] ToClient metricUpdate
+             * @property {monitor_web_socket.IPong|null} [pong] ToClient pong
              */
     
             /**
@@ -420,17 +651,25 @@
              */
             ToClient.prototype.metricUpdate = null;
     
+            /**
+             * ToClient pong.
+             * @member {monitor_web_socket.IPong|null|undefined} pong
+             * @memberof monitor_web_socket.ToClient
+             * @instance
+             */
+            ToClient.prototype.pong = null;
+    
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
     
             /**
              * ToClient msg.
-             * @member {"metricUpdate"|undefined} msg
+             * @member {"metricUpdate"|"pong"|undefined} msg
              * @memberof monitor_web_socket.ToClient
              * @instance
              */
             Object.defineProperty(ToClient.prototype, "msg", {
-                get: $util.oneOfGetter($oneOfFields = ["metricUpdate"]),
+                get: $util.oneOfGetter($oneOfFields = ["metricUpdate", "pong"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
     
@@ -460,6 +699,8 @@
                     writer = $Writer.create();
                 if (message.metricUpdate != null && Object.hasOwnProperty.call(message, "metricUpdate"))
                     $root.monitor_web_socket.MetricUpdate.encode(message.metricUpdate, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
+                if (message.pong != null && Object.hasOwnProperty.call(message, "pong"))
+                    $root.monitor_web_socket.Pong.encode(message.pong, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 return writer;
             };
     
@@ -496,6 +737,9 @@
                     switch (tag >>> 3) {
                     case 2:
                         message.metricUpdate = $root.monitor_web_socket.MetricUpdate.decode(reader, reader.uint32());
+                        break;
+                    case 3:
+                        message.pong = $root.monitor_web_socket.Pong.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -541,6 +785,16 @@
                             return "metricUpdate." + error;
                     }
                 }
+                if (message.pong != null && message.hasOwnProperty("pong")) {
+                    if (properties.msg === 1)
+                        return "msg: multiple values";
+                    properties.msg = 1;
+                    {
+                        var error = $root.monitor_web_socket.Pong.verify(message.pong);
+                        if (error)
+                            return "pong." + error;
+                    }
+                }
                 return null;
             };
     
@@ -560,6 +814,11 @@
                     if (typeof object.metricUpdate !== "object")
                         throw TypeError(".monitor_web_socket.ToClient.metricUpdate: object expected");
                     message.metricUpdate = $root.monitor_web_socket.MetricUpdate.fromObject(object.metricUpdate);
+                }
+                if (object.pong != null) {
+                    if (typeof object.pong !== "object")
+                        throw TypeError(".monitor_web_socket.ToClient.pong: object expected");
+                    message.pong = $root.monitor_web_socket.Pong.fromObject(object.pong);
                 }
                 return message;
             };
@@ -581,6 +840,11 @@
                     object.metricUpdate = $root.monitor_web_socket.MetricUpdate.toObject(message.metricUpdate, options);
                     if (options.oneofs)
                         object.msg = "metricUpdate";
+                }
+                if (message.pong != null && message.hasOwnProperty("pong")) {
+                    object.pong = $root.monitor_web_socket.Pong.toObject(message.pong, options);
+                    if (options.oneofs)
+                        object.msg = "pong";
                 }
                 return object;
             };
@@ -789,6 +1053,202 @@
             };
     
             return MetricUpdate;
+        })();
+    
+        monitor_web_socket.Pong = (function() {
+    
+            /**
+             * Properties of a Pong.
+             * @memberof monitor_web_socket
+             * @interface IPong
+             * @property {Uint8Array|null} [payload] Pong payload
+             */
+    
+            /**
+             * Constructs a new Pong.
+             * @memberof monitor_web_socket
+             * @classdesc Represents a Pong.
+             * @implements IPong
+             * @constructor
+             * @param {monitor_web_socket.IPong=} [properties] Properties to set
+             */
+            function Pong(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+    
+            /**
+             * Pong payload.
+             * @member {Uint8Array} payload
+             * @memberof monitor_web_socket.Pong
+             * @instance
+             */
+            Pong.prototype.payload = $util.newBuffer([]);
+    
+            /**
+             * Creates a new Pong instance using the specified properties.
+             * @function create
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {monitor_web_socket.IPong=} [properties] Properties to set
+             * @returns {monitor_web_socket.Pong} Pong instance
+             */
+            Pong.create = function create(properties) {
+                return new Pong(properties);
+            };
+    
+            /**
+             * Encodes the specified Pong message. Does not implicitly {@link monitor_web_socket.Pong.verify|verify} messages.
+             * @function encode
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {monitor_web_socket.IPong} message Pong message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Pong.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.payload != null && Object.hasOwnProperty.call(message, "payload"))
+                    writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.payload);
+                return writer;
+            };
+    
+            /**
+             * Encodes the specified Pong message, length delimited. Does not implicitly {@link monitor_web_socket.Pong.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {monitor_web_socket.IPong} message Pong message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            Pong.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+    
+            /**
+             * Decodes a Pong message from the specified reader or buffer.
+             * @function decode
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {monitor_web_socket.Pong} Pong
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Pong.decode = function decode(reader, length) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.monitor_web_socket.Pong();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    switch (tag >>> 3) {
+                    case 1:
+                        message.payload = reader.bytes();
+                        break;
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Decodes a Pong message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {monitor_web_socket.Pong} Pong
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            Pong.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+    
+            /**
+             * Verifies a Pong message.
+             * @function verify
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            Pong.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.payload != null && message.hasOwnProperty("payload"))
+                    if (!(message.payload && typeof message.payload.length === "number" || $util.isString(message.payload)))
+                        return "payload: buffer expected";
+                return null;
+            };
+    
+            /**
+             * Creates a Pong message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {monitor_web_socket.Pong} Pong
+             */
+            Pong.fromObject = function fromObject(object) {
+                if (object instanceof $root.monitor_web_socket.Pong)
+                    return object;
+                var message = new $root.monitor_web_socket.Pong();
+                if (object.payload != null)
+                    if (typeof object.payload === "string")
+                        $util.base64.decode(object.payload, message.payload = $util.newBuffer($util.base64.length(object.payload)), 0);
+                    else if (object.payload.length)
+                        message.payload = object.payload;
+                return message;
+            };
+    
+            /**
+             * Creates a plain object from a Pong message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof monitor_web_socket.Pong
+             * @static
+             * @param {monitor_web_socket.Pong} message Pong
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            Pong.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.defaults)
+                    if (options.bytes === String)
+                        object.payload = "";
+                    else {
+                        object.payload = [];
+                        if (options.bytes !== Array)
+                            object.payload = $util.newBuffer(object.payload);
+                    }
+                if (message.payload != null && message.hasOwnProperty("payload"))
+                    object.payload = options.bytes === String ? $util.base64.encode(message.payload, 0, message.payload.length) : options.bytes === Array ? Array.prototype.slice.call(message.payload) : message.payload;
+                return object;
+            };
+    
+            /**
+             * Converts this Pong to JSON.
+             * @function toJSON
+             * @memberof monitor_web_socket.Pong
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            Pong.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+    
+            return Pong;
         })();
     
         return monitor_web_socket;

@@ -391,7 +391,19 @@ impl WebSocketActor {
                     }
                     Continue::Continue
                 });
-            }
+            },
+            web_socket_types::to_server::Msg::Ping(ping) => {
+                let pong = web_socket_types::ToClient {
+                    msg: Some(web_socket_types::to_client::Msg::Pong(
+                        web_socket_types::Pong {
+                            payload: ping.payload
+                        }))
+                };
+
+                if let Err(e) = self.send(ctx, &pong) {
+                    error!("{} Error sending pong: {}", log_ctx, e);
+                }
+            },
         }
     }
 

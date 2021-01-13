@@ -10,10 +10,15 @@ message ToServer {
 
   oneof msg {
     SubscribeToMetrics subscribeToMetrics = 2;
+    Ping ping = 3;
   }
 }
 
 message SubscribeToMetrics {}
+
+message Ping {
+  bytes payload = 1;
+}
 
 // ## ToClient and sub-types
 message ToClient {
@@ -21,9 +26,14 @@ message ToClient {
 
   oneof msg {
     MetricUpdate metricUpdate = 2;
+    Pong pong = 3;
   }
 }
 
 message MetricUpdate {
   monitor_core_types.Metric metric = 1;
+}
+
+message Pong {
+  bytes payload = 1;
 }
