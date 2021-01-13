@@ -110,13 +110,13 @@ impl actix::Handler<MetricUpdateMessage> for WebSocketActor {
             }
         };
         let ws_msg = web_socket_types::ToClient {
-            msg: Some(web_socket_types::to_client::Msg::MetricUpdate(
-                web_socket_types::MetricUpdate {
-                    metric: Some(m_proto),
+            msg: Some(web_socket_types::to_client::Msg::MetricsUpdate(
+                web_socket_types::MetricsUpdate {
+                    metrics: vec![m_proto],
                 })),
         };
         if let Err(e) = self.send(ctx, &ws_msg) {
-            error!("{} Error sending to MetricUpdate: {}", log_ctx, e);
+            error!("{} Error sending MetricsUpdate: {}", log_ctx, e);
             return ();
         }
     }
@@ -183,7 +183,7 @@ impl WebSocketActor {
                         })),
                 };
                 if let Err(e) = self.send(ctx, &msg) {
-                    error!("{} Error sending to MetricsUpdate: {}", log_ctx, e);
+                    error!("{} Error sending MetricsUpdate: {}", log_ctx, e);
                     return;
                 }
             },
