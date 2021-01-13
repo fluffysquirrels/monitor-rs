@@ -3,14 +3,11 @@
 ## WIP
 
 * Web front-end
-    * Get metric updates over WebSocket
-        * Fix update race because WebSocket doesn't return initial values.
 
 ## Bugs
 
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* monitor web: Fix update race because WebSocket doesn't return initial values.
 * Redirect to login when WebSocket auth fails.
 
 ## Features

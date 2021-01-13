@@ -96,33 +96,10 @@ function wsSend(msg) {
 function wsHandleMessage(msg) {
     if (msg.metricUpdate) {
         const m = msg.metricUpdate;
-        console.debug("ws metricUpdate key =", m.metric.key);
-        if (vueApp) {
-            const displayKey = m.metric.key.name + "@" + m.metric.key.fromHost.name;
-            let displayValue = null;
-            if (m.metric.latest.none) {
-                displayValue = m.metric.latest.ok ? "Ok": "Err";
-            } else if (m.metric.latest.i64 !== undefined) {
-                displayValue = m.metric.latest.i64.toString();
-            } else if (m.metric.latest.f64 !== undefined) {
-                displayValue = m.metric.latest.f64.toString();
-            }
-
-            const o = {
-                metricKey: displayKey,
-                ok: m.metric.latest.ok,
-                value: displayValue,
-            };
-
-            // TODO: Would be nice if this were O(1) somehow using a map.
-            const existing = vueApp.metrics.find(vm => vm.metricKey === displayKey);
-            if (existing) {
-                existing.ok = o.ok;
-                existing.value = o.value;
-            } else {
-                vueApp.metrics.push(o);
-            }
-        }
+        handleUpdates([m.metric]);
+    } else if (msg.metricsUpdate) {
+        const m = msg.metricsUpdate;
+        handleUpdates(m.metrics);
     } else if (msg.pong) {
         const pong = msg.pong;
         const ping =
@@ -137,6 +114,39 @@ function wsHandleMessage(msg) {
         }
     } else {
         console.error("wsHandleMessage unknown message: ", msg);
+    }
+}
+
+function handleUpdates(metrics) {
+    console.debug("handleUpdates len = ", metrics.length);
+    if (vueApp === null) {
+        return;
+    }
+    for (const metric of metrics) {
+        const displayKey = metric.key.name + "@" + metric.key.fromHost.name;
+        let displayValue = null;
+        if (metric.latest.none) {
+            displayValue = metric.latest.ok ? "Ok": "Err";
+        } else if (metric.latest.i64 !== undefined) {
+            displayValue = metric.latest.i64.toString();
+        } else if (metric.latest.f64 !== undefined) {
+            displayValue = metric.latest.f64.toString();
+        }
+
+        const o = {
+            metricKey: displayKey,
+            ok: metric.latest.ok,
+            value: displayValue,
+        };
+
+        // TODO: Would be nice if this were O(1) somehow using a map.
+        const existing = vueApp.metrics.find(vm => vm.metricKey === displayKey);
+        if (existing) {
+            existing.ok = o.ok;
+            existing.value = o.value;
+        } else {
+            vueApp.metrics.push(o);
+        }
     }
 }
 

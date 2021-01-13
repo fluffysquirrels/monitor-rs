@@ -9,6 +9,7 @@ use crate::{
 use monitor::{
     Continue,
     metric_store::{Metric},
+    monitor_core_types,
 };
 use prost::Message;
 
@@ -140,7 +141,10 @@ impl WebSocketActor {
         match msg {
             web_socket_types::to_server::Msg::SubscribeToMetrics(_sub) => {
                 let addr = ctx.address();
-                self.ctx.metric_store.lock().unwrap().update_signal_for_all().connect(move |m| {
+
+                let mut ms_lock = self.ctx.metric_store.lock().unwrap();
+                let log_ctxc = log_ctx.clone();
+                ms_lock.update_signal_for_all().connect(move |m| {
                     let msg = MetricUpdateMessage {
                         metric: m,
                     };
@@ -149,17 +153,39 @@ impl WebSocketActor {
                         match e {
                             SendError::Full(_msg) => {
                                 error!("{} Error sending metric update message: queue full",
-                                       log_ctx);
+                                       log_ctxc);
                             },
                             SendError::Closed(_msg) => {
                                 info!("{} Sending metric update message: recipient closed",
-                                      log_ctx);
+                                      log_ctxc);
                                 return Continue::Disconnect;
                             },
                         }
                     }
                     Continue::Continue
                 });
+                let metrics = ms_lock.query_all();
+                drop(ms_lock);
+
+                let protos = metrics.iter().map(|m| m.to_remote(&self.ctx.config.host_name))
+                                    .collect::<Result<Vec<monitor_core_types::Metric>, _>>();
+                let protos = match protos {
+                    Err(e) => {
+                        error!("{} Error encoding Metrics to protobuf: {}", log_ctx, e);
+                        return;
+                    }
+                    Ok(ps) => ps,
+                };
+                let msg = web_socket_types::ToClient {
+                    msg: Some(web_socket_types::to_client::Msg::MetricsUpdate(
+                        web_socket_types::MetricsUpdate {
+                            metrics: protos,
+                        })),
+                };
+                if let Err(e) = self.send(ctx, &msg) {
+                    error!("{} Error sending to MetricsUpdate: {}", log_ctx, e);
+                    return;
+                }
             },
             web_socket_types::to_server::Msg::Ping(ping) => {
                 let pong = web_socket_types::ToClient {
@@ -192,4 +218,3 @@ impl WebSocketActor {
         Ok(())
     }
 }
-

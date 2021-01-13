@@ -26,12 +26,17 @@ message ToClient {
 
   oneof msg {
     MetricUpdate metricUpdate = 2;
+    MetricsUpdate metricsUpdate = 4;
     Pong pong = 3;
   }
 }
 
 message MetricUpdate {
   monitor_core_types.Metric metric = 1;
+}
+
+message MetricsUpdate {
+  repeated monitor_core_types.Metric metrics = 1;
 }
 
 message Pong {

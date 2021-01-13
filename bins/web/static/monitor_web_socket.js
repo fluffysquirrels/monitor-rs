@@ -625,6 +625,7 @@
              * @memberof monitor_web_socket
              * @interface IToClient
              * @property {monitor_web_socket.IMetricUpdate|null} [metricUpdate] ToClient metricUpdate
+             * @property {monitor_web_socket.IMetricsUpdate|null} [metricsUpdate] ToClient metricsUpdate
              * @property {monitor_web_socket.IPong|null} [pong] ToClient pong
              */
     
@@ -652,6 +653,14 @@
             ToClient.prototype.metricUpdate = null;
     
             /**
+             * ToClient metricsUpdate.
+             * @member {monitor_web_socket.IMetricsUpdate|null|undefined} metricsUpdate
+             * @memberof monitor_web_socket.ToClient
+             * @instance
+             */
+            ToClient.prototype.metricsUpdate = null;
+    
+            /**
              * ToClient pong.
              * @member {monitor_web_socket.IPong|null|undefined} pong
              * @memberof monitor_web_socket.ToClient
@@ -664,12 +673,12 @@
     
             /**
              * ToClient msg.
-             * @member {"metricUpdate"|"pong"|undefined} msg
+             * @member {"metricUpdate"|"metricsUpdate"|"pong"|undefined} msg
              * @memberof monitor_web_socket.ToClient
              * @instance
              */
             Object.defineProperty(ToClient.prototype, "msg", {
-                get: $util.oneOfGetter($oneOfFields = ["metricUpdate", "pong"]),
+                get: $util.oneOfGetter($oneOfFields = ["metricUpdate", "metricsUpdate", "pong"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
     
@@ -701,6 +710,8 @@
                     $root.monitor_web_socket.MetricUpdate.encode(message.metricUpdate, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
                 if (message.pong != null && Object.hasOwnProperty.call(message, "pong"))
                     $root.monitor_web_socket.Pong.encode(message.pong, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                if (message.metricsUpdate != null && Object.hasOwnProperty.call(message, "metricsUpdate"))
+                    $root.monitor_web_socket.MetricsUpdate.encode(message.metricsUpdate, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
                 return writer;
             };
     
@@ -737,6 +748,9 @@
                     switch (tag >>> 3) {
                     case 2:
                         message.metricUpdate = $root.monitor_web_socket.MetricUpdate.decode(reader, reader.uint32());
+                        break;
+                    case 4:
+                        message.metricsUpdate = $root.monitor_web_socket.MetricsUpdate.decode(reader, reader.uint32());
                         break;
                     case 3:
                         message.pong = $root.monitor_web_socket.Pong.decode(reader, reader.uint32());
@@ -785,6 +799,16 @@
                             return "metricUpdate." + error;
                     }
                 }
+                if (message.metricsUpdate != null && message.hasOwnProperty("metricsUpdate")) {
+                    if (properties.msg === 1)
+                        return "msg: multiple values";
+                    properties.msg = 1;
+                    {
+                        var error = $root.monitor_web_socket.MetricsUpdate.verify(message.metricsUpdate);
+                        if (error)
+                            return "metricsUpdate." + error;
+                    }
+                }
                 if (message.pong != null && message.hasOwnProperty("pong")) {
                     if (properties.msg === 1)
                         return "msg: multiple values";
@@ -814,6 +838,11 @@
                     if (typeof object.metricUpdate !== "object")
                         throw TypeError(".monitor_web_socket.ToClient.metricUpdate: object expected");
                     message.metricUpdate = $root.monitor_web_socket.MetricUpdate.fromObject(object.metricUpdate);
+                }
+                if (object.metricsUpdate != null) {
+                    if (typeof object.metricsUpdate !== "object")
+                        throw TypeError(".monitor_web_socket.ToClient.metricsUpdate: object expected");
+                    message.metricsUpdate = $root.monitor_web_socket.MetricsUpdate.fromObject(object.metricsUpdate);
                 }
                 if (object.pong != null) {
                     if (typeof object.pong !== "object")
@@ -845,6 +874,11 @@
                     object.pong = $root.monitor_web_socket.Pong.toObject(message.pong, options);
                     if (options.oneofs)
                         object.msg = "pong";
+                }
+                if (message.metricsUpdate != null && message.hasOwnProperty("metricsUpdate")) {
+                    object.metricsUpdate = $root.monitor_web_socket.MetricsUpdate.toObject(message.metricsUpdate, options);
+                    if (options.oneofs)
+                        object.msg = "metricsUpdate";
                 }
                 return object;
             };
@@ -1053,6 +1087,214 @@
             };
     
             return MetricUpdate;
+        })();
+    
+        monitor_web_socket.MetricsUpdate = (function() {
+    
+            /**
+             * Properties of a MetricsUpdate.
+             * @memberof monitor_web_socket
+             * @interface IMetricsUpdate
+             * @property {Array.<monitor_core_types.IMetric>|null} [metrics] MetricsUpdate metrics
+             */
+    
+            /**
+             * Constructs a new MetricsUpdate.
+             * @memberof monitor_web_socket
+             * @classdesc Represents a MetricsUpdate.
+             * @implements IMetricsUpdate
+             * @constructor
+             * @param {monitor_web_socket.IMetricsUpdate=} [properties] Properties to set
+             */
+            function MetricsUpdate(properties) {
+                this.metrics = [];
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+    
+            /**
+             * MetricsUpdate metrics.
+             * @member {Array.<monitor_core_types.IMetric>} metrics
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @instance
+             */
+            MetricsUpdate.prototype.metrics = $util.emptyArray;
+    
+            /**
+             * Creates a new MetricsUpdate instance using the specified properties.
+             * @function create
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {monitor_web_socket.IMetricsUpdate=} [properties] Properties to set
+             * @returns {monitor_web_socket.MetricsUpdate} MetricsUpdate instance
+             */
+            MetricsUpdate.create = function create(properties) {
+                return new MetricsUpdate(properties);
+            };
+    
+            /**
+             * Encodes the specified MetricsUpdate message. Does not implicitly {@link monitor_web_socket.MetricsUpdate.verify|verify} messages.
+             * @function encode
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {monitor_web_socket.IMetricsUpdate} message MetricsUpdate message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            MetricsUpdate.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.metrics != null && message.metrics.length)
+                    for (var i = 0; i < message.metrics.length; ++i)
+                        $root.monitor_core_types.Metric.encode(message.metrics[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                return writer;
+            };
+    
+            /**
+             * Encodes the specified MetricsUpdate message, length delimited. Does not implicitly {@link monitor_web_socket.MetricsUpdate.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {monitor_web_socket.IMetricsUpdate} message MetricsUpdate message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            MetricsUpdate.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+    
+            /**
+             * Decodes a MetricsUpdate message from the specified reader or buffer.
+             * @function decode
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {monitor_web_socket.MetricsUpdate} MetricsUpdate
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            MetricsUpdate.decode = function decode(reader, length) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.monitor_web_socket.MetricsUpdate();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    switch (tag >>> 3) {
+                    case 1:
+                        if (!(message.metrics && message.metrics.length))
+                            message.metrics = [];
+                        message.metrics.push($root.monitor_core_types.Metric.decode(reader, reader.uint32()));
+                        break;
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Decodes a MetricsUpdate message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {monitor_web_socket.MetricsUpdate} MetricsUpdate
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            MetricsUpdate.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+    
+            /**
+             * Verifies a MetricsUpdate message.
+             * @function verify
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            MetricsUpdate.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.metrics != null && message.hasOwnProperty("metrics")) {
+                    if (!Array.isArray(message.metrics))
+                        return "metrics: array expected";
+                    for (var i = 0; i < message.metrics.length; ++i) {
+                        var error = $root.monitor_core_types.Metric.verify(message.metrics[i]);
+                        if (error)
+                            return "metrics." + error;
+                    }
+                }
+                return null;
+            };
+    
+            /**
+             * Creates a MetricsUpdate message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {monitor_web_socket.MetricsUpdate} MetricsUpdate
+             */
+            MetricsUpdate.fromObject = function fromObject(object) {
+                if (object instanceof $root.monitor_web_socket.MetricsUpdate)
+                    return object;
+                var message = new $root.monitor_web_socket.MetricsUpdate();
+                if (object.metrics) {
+                    if (!Array.isArray(object.metrics))
+                        throw TypeError(".monitor_web_socket.MetricsUpdate.metrics: array expected");
+                    message.metrics = [];
+                    for (var i = 0; i < object.metrics.length; ++i) {
+                        if (typeof object.metrics[i] !== "object")
+                            throw TypeError(".monitor_web_socket.MetricsUpdate.metrics: object expected");
+                        message.metrics[i] = $root.monitor_core_types.Metric.fromObject(object.metrics[i]);
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Creates a plain object from a MetricsUpdate message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @static
+             * @param {monitor_web_socket.MetricsUpdate} message MetricsUpdate
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            MetricsUpdate.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.arrays || options.defaults)
+                    object.metrics = [];
+                if (message.metrics && message.metrics.length) {
+                    object.metrics = [];
+                    for (var j = 0; j < message.metrics.length; ++j)
+                        object.metrics[j] = $root.monitor_core_types.Metric.toObject(message.metrics[j], options);
+                }
+                return object;
+            };
+    
+            /**
+             * Converts this MetricsUpdate to JSON.
+             * @function toJSON
+             * @memberof monitor_web_socket.MetricsUpdate
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            MetricsUpdate.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+    
+            return MetricsUpdate;
         })();
     
         monitor_web_socket.Pong = (function() {
