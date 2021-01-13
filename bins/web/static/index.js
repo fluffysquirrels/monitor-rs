@@ -94,10 +94,7 @@ function wsSend(msg) {
 
 /// Handle an incoming decoded message
 function wsHandleMessage(msg) {
-    if (msg.metricUpdate) {
-        const m = msg.metricUpdate;
-        handleUpdates([m.metric]);
-    } else if (msg.metricsUpdate) {
+    if (msg.metricsUpdate) {
         const m = msg.metricsUpdate;
         handleUpdates(m.metrics);
     } else if (msg.pong) {

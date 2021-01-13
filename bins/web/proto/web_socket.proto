@@ -22,17 +22,12 @@ message Ping {
 
 // ## ToClient and sub-types
 message ToClient {
-  reserved 1;
+  reserved 1, 2;
 
   oneof msg {
-    MetricUpdate metricUpdate = 2;
     MetricsUpdate metricsUpdate = 4;
     Pong pong = 3;
   }
-}
-
-message MetricUpdate {
-  monitor_core_types.Metric metric = 1;
 }
 
 message MetricsUpdate {
