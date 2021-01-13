@@ -11,12 +11,13 @@
 * `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
 * Fix update race because WebSocket doesn't return initial values.
+* Redirect to login when WebSocket auth fails.
 
 ## Features
 
 * Web front-end
     * WebSocket
-        * Ping frames from client
+        * Ping messages from client
     * Notifications when page is open
     * Notifications when page is not open?
     * Authentication
@@ -32,6 +33,7 @@
         * Then JS rendered from JSON injected into the page
         * Then JS rendered from JSON sent over a WebSocket
     * Notifications
+    * Show count of checks
 * Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
