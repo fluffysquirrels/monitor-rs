@@ -241,6 +241,14 @@ function vueStart() {
                 notificationStatus: _webNotifier.permission(),
             };
         },
+        computed: {
+            metricsNumOk() {
+                return this.metrics.filter(m => m.ok).length;
+            },
+            metricsNumErr() {
+                return this.metrics.filter(m => !m.ok).length;
+            },
+        },
         methods: {
             notificationsAllow(evt) {
                 _webNotifier.requestPermission().then((evt) => {
@@ -256,7 +264,7 @@ function vueStart() {
             },
             notificationsTest() {
                 _webNotifier.exampleNotification();
-            }
+            },
         },
     };
 

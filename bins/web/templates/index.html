@@ -45,6 +45,17 @@
           You need to use your browser to enable them again
         </span>
       </div>
+      <div id="summary">
+        <span class="metric-value-Ok">
+          <span v-text="metricsNumOk"></span>
+          Ok
+        </span>
+        and
+        <span class="metric-value-Err">
+          <span v-text="metricsNumErr"></span>
+          Err
+        </span>
+      </div>
       <div>
         <div v-for="metric in metrics" v-bind:key="metric.metricKey" class="metric">
           <span v-bind:class="['metric-value', 'metric-value-' + (metric.ok ? 'Ok' : 'Err')]"
