@@ -28,6 +28,23 @@
 
     <div id="app" style="display: none">
       <h1>Metrics</h1>
+      <div v-if="showAskNotificationPermission">
+        <span>Allow notifications?</span>
+        <button @click="notificationsAllow">Allow</button>
+        <button @click="notificationsDisable">Disable</button>
+      </div>
+      <div v-else>
+        Notifications are
+        <em v-text="notificationStatus"></em>
+        <button @click="notificationsTest">Test</button>
+        <button v-if="notificationStatus === 'granted'"
+                @click="notificationsDisable">Disable</button>
+        <button v-if="notificationStatus === 'disabled'"
+                @click="notificationsAllow">Allow</button>
+        <span v-if="notificationStatus === 'denied'">
+          You need to use your browser to enable them again
+        </span>
+      </div>
       <div>
         <div v-for="metric in metrics" v-bind:key="metric.metricKey" class="metric">
           <span v-bind:class="['metric-value', 'metric-value-' + (metric.ok ? 'Ok' : 'Err')]"

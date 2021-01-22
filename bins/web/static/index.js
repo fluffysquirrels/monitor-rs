@@ -1,10 +1,14 @@
 import * as Vue from "/static/third-party/vue.esm-browser.js";
+import * as webNotifier from "/static/web-notifier.js";
 const monitor_web_socket = protobuf.roots["default"].monitor_web_socket;
 
 function indexMain() {
+    _webNotifier = webNotifier.create();
     vueStart();
     wsStart();
 }
+
+let _webNotifier = null;
 
 let ws = null;
 let wsPingIntervalTimeout = null;
@@ -144,6 +148,12 @@ function handleUpdates(metrics) {
         } else {
             vueApp.metrics.push(o);
         }
+
+        if (!metric.latest.ok) {
+            _webNotifier.notify(`Error for metric '${displayKey}'`, {
+                body: `Value: ${displayValue}`,
+            });
+        }
     }
 }
 
@@ -225,8 +235,29 @@ function vueStart() {
         data() {
             return {
                 metrics: [],
+
+                showAskNotificationPermission:
+                    _webNotifier.permission() === "default",
+                notificationStatus: _webNotifier.permission(),
             };
-        }
+        },
+        methods: {
+            notificationsAllow(evt) {
+                _webNotifier.requestPermission().then((evt) => {
+                    vueApp.notificationStatus = evt.permission;
+                });
+                vueApp.notificationStatus = "requested";
+                vueApp.showAskNotificationPermission = false;
+            },
+            notificationsDisable(evt) {
+                _webNotifier.disable();
+                vueApp.notificationStatus = "disabled";
+                vueApp.showAskNotificationPermission = false;
+            },
+            notificationsTest() {
+                _webNotifier.exampleNotification();
+            }
+        },
     };
 
     vueApp = Vue.createApp(app).mount("#app");
