@@ -23,11 +23,6 @@
             * This is a big old memory leak right now. Enforce one session per user?
         * Refresh sessions near their expiry? (50% towards expiry?)
     * Anti-CSRF
-    * Show check results
-        * Start with statically rendered HTML
-        * Then JS rendered from JSON injected into the page
-        * Then JS rendered from JSON sent over a WebSocket
-    * Notifications
     * Show count of checks
 * Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
