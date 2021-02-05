@@ -3,8 +3,12 @@ import * as util from "/static/util.js";
 const monitor_web_socket = protobuf.roots["default"].monitor_web_socket;
 
 let ws = null;
-let wsPingIntervalTimeout = null;
+let pingIntervalTimeout = null;
 let onUpdate = (metrics) => {};
+
+/// An array of { payload: Array<Number>, time: Date, timeoutId: TimeoutId }.
+/// Each entry represents a ping we sent but haven't yet received a pong back.
+let outstandingPings = [];
 
 const PING_INTERVAL_MS             = 60 * 1000; // 60s
 const PING_TIMEOUT_MS              = 15 * 1000; // 15s
@@ -29,8 +33,8 @@ export function start() {
     ws.binaryType = "arraybuffer";
     ws.onclose = (evt) => {
         console.error("ws.onclose:", evt);
-        wsShutdown();
-        wsSetRetry();
+        shutdown();
+        setRetry();
     };
     ws.onerror = (evt) => {
         console.error("ws.onerror:", evt);
@@ -46,22 +50,22 @@ export function start() {
             return;
         }
         console.debug("ws.onmessage ToClient.decode =", decode);
-        wsHandleMessage(decode);
+        handleMessage(decode);
     };
     ws.onopen = (evt) => {
         console.log("ws.onopen:", evt);
-        wsStartPings();
+        startPings();
         const subReq = monitor_web_socket.SubscribeToMetrics.create();
         const req = monitor_web_socket.ToServer.create({ subscribeToMetrics: subReq });
-        wsSend(req);
+        send(req);
     };
 }
 
 /// Shutdown the WebSocket connection. Silent if the connection is already closed.
-function wsShutdown(opts) {
+function shutdown(opts) {
     const { code } = opts || {};
 
-    console.warn("wsShutdown");
+    console.warn("ws.shutdown");
 
     if (ws === null) {
         return;
@@ -76,83 +80,79 @@ function wsShutdown(opts) {
         }
     }
 
-    wsStopPings();
+    stopPings();
 
     ws = null;
 }
 
-function wsSetRetry() {
+function setRetry() {
     setTimeout(() => {
-        wsStart();
+        start();
     }, CONNECTION_RETRY_INTERVAL_MS);
 }
 
-function wsSend(msg) {
-    console.debug("wsSend: msg =", msg);
+function send(msg) {
+    console.debug("ws.send: msg =", msg);
     const buf = monitor_web_socket.ToServer.encode(msg).finish();
     ws.send(buf);
 }
 
 /// Handle an incoming decoded message
-function wsHandleMessage(msg) {
+function handleMessage(msg) {
     if (msg.metricsUpdate) {
         const m = msg.metricsUpdate;
         onUpdate(m.metrics);
     } else if (msg.pong) {
         const pong = msg.pong;
         const ping =
-            wsOutstandingPings.find((x) => util.arraysEqual(x.payload, pong.payload));
+            outstandingPings.find((x) => util.arraysEqual(x.payload, pong.payload));
         if (ping === undefined) {
             console.error("ws pong couldn't find ping payload =", pong.payload);
         } else {
             const duration = (new Date()) - ping.time;
             console.debug("ws Got pong, duration = " + duration + "ms");
             clearTimeout(ping.timeoutId);
-            wsOutstandingPings = wsOutstandingPings.filter((x) => x !== ping);
+            outstandingPings = outstandingPings.filter((x) => x !== ping);
         }
     } else {
-        console.error("wsHandleMessage unknown message: ", msg);
+        console.error("ws.handleMessage unknown message: ", msg);
     }
 }
 
-function wsStartPings() {
-    if (wsPingIntervalTimeout !== null) {
-        console.error("wsStartPing wsPingIntervalTimeout !== null");
+function startPings() {
+    if (pingIntervalTimeout !== null) {
+        console.error("ws.startPings pingIntervalTimeout !== null");
         return;
     }
-    wsPingIntervalTimeout = setTimeout(wsSendPingLoop, PING_INTERVAL_MS);
+    pingIntervalTimeout = setTimeout(sendPingLoop, PING_INTERVAL_MS);
 }
 
-function wsStopPings() {
-    if (wsPingIntervalTimeout !== null) {
-        clearTimeout(wsPingIntervalTimeout);
-        wsPingIntervalTimeout = null;
+function stopPings() {
+    if (pingIntervalTimeout !== null) {
+        clearTimeout(pingIntervalTimeout);
+        pingIntervalTimeout = null;
     }
-    wsOutstandingPings = [];
+    outstandingPings = [];
 }
 
-/// An array of { payload: Array<Number>, time: Date, timeoutId: TimeoutId }.
-/// Each entry represents a ping we sent but haven't yet received a pong back.
-let wsOutstandingPings = [];
-
-function wsSendPingLoop() {
+function sendPingLoop() {
     const payload = util.randomBytes(16);
     const pingReq = monitor_web_socket.Ping.create({ payload });
     const req = monitor_web_socket.ToServer.create({ ping: pingReq });
-    wsSend(req);
+    send(req);
     const outstandingPing = {
         payload,
         time: new Date(),
-        timeoutId: setTimeout(() => wsOutstandingPingTimeout(outstandingPing), PING_TIMEOUT_MS),
+        timeoutId: setTimeout(() => outstandingPingTimeout(outstandingPing), PING_TIMEOUT_MS),
     };
-    wsOutstandingPings.push(outstandingPing);
-    wsPingIntervalTimeout = setTimeout(wsSendPingLoop, PING_INTERVAL_MS);
+    outstandingPings.push(outstandingPing);
+    pingIntervalTimeout = setTimeout(sendPingLoop, PING_INTERVAL_MS);
 }
 
 /// A callback after waiting PING_TIMEOUT_MS after a ping request:
 /// our ping has timed out and we assume the connection is dead.
-function wsOutstandingPingTimeout(outstandingPing) {
+function outstandingPingTimeout(outstandingPing) {
     console.warn("Outstanding WebSocket ping timeout, shutting down WebSocket.");
-    wsShutdown();
-    wsSetRetry();
+    shutdown();
+    setRetry();
 }
