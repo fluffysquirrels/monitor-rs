@@ -1,5 +1,7 @@
 import * as Vue from "/static/third-party/vue.esm-browser.js";
 import * as webNotifier from "/static/web-notifier.js";
+import * as util from "/static/util.js";
+
 const monitor_web_socket = protobuf.roots["default"].monitor_web_socket;
 
 function indexMain() {
@@ -104,7 +106,7 @@ function wsHandleMessage(msg) {
     } else if (msg.pong) {
         const pong = msg.pong;
         const ping =
-            wsOutstandingPings.find((x) => arraysEqual(x.payload, pong.payload));
+            wsOutstandingPings.find((x) => util.arraysEqual(x.payload, pong.payload));
         if (ping === undefined) {
             console.error("ws pong couldn't find ping payload =", pong.payload);
         } else {
@@ -178,7 +180,7 @@ function wsStopPings() {
 let wsOutstandingPings = [];
 
 function wsSendPingLoop() {
-    const payload = getRandomBytes(16);
+    const payload = util.randomBytes(16);
     const pingReq = monitor_web_socket.Ping.create({ payload });
     const req = monitor_web_socket.ToServer.create({ ping: pingReq });
     wsSend(req);
@@ -197,35 +199,6 @@ function wsOutstandingPingTimeout(outstandingPing) {
     console.warn("Outstanding WebSocket ping timeout, shutting down WebSocket.");
     wsShutdown();
     wsSetRetry();
-}
-
-function getRandomBytes(len) {
-    const bytes = new Array(len);
-    for (let idx = 0; idx < len; idx += 1) {
-        const byte = Math.floor(Math.random() * 256);
-        bytes[idx] = byte;
-    }
-    return bytes;
-}
-
-function arraysEqual(a, b) {
-    if (a === b) {
-        return true;
-    }
-    if (a == null || b == null) {
-        return false;
-    }
-    if (a.length !== b.length) {
-        return false;
-    }
-
-    for (let idx = 0; idx < a.length; idx += 1) {
-        if (a[idx] !== b[idx]) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 let vueApp = null;
