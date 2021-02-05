@@ -1,10 +1,21 @@
+//! Represents a WebSocket connection to the monitor-web server.
+
 import * as util from "/static/util.js";
 
 const monitor_web_socket = protobuf.roots["default"].monitor_web_socket;
 
+const States = {
+    CONNECTING: "connecting",
+    CONNECTED: "connected, pending data",
+    ALIVE: "alive",
+    CLOSED: "closed",
+};
+
 let ws = null;
 let pingIntervalTimeout = null;
 let onUpdate = (metrics) => {};
+let onConnChange = (connState) => {};
+let state = States.CLOSED;
 
 /// An array of { payload: Array<Number>, time: Date, timeoutId: TimeoutId }.
 /// Each entry represents a ping we sent but haven't yet received a pong back.
@@ -12,11 +23,17 @@ let outstandingPings = [];
 
 const PING_INTERVAL_MS             = 60 * 1000; // 60s
 const PING_TIMEOUT_MS              = 15 * 1000; // 15s
-
 const CONNECTION_RETRY_INTERVAL_MS = 5  * 1000; // 5s
+
+/// For fault injection, ignore pongs.
+const SKIP_PONGS = false;
 
 export function setOnUpdate(cb) {
     onUpdate = cb;
+}
+
+export function setOnConnChange(cb) {
+    onConnChange = cb;
 }
 
 export function start() {
@@ -29,10 +46,14 @@ export function start() {
     const url = (window.location.protocol === "https:" ? "wss://" : "ws://") +
         window.location.hostname + ":" + window.location.port + "/ws/";
     console.info("ws.start connecting to:", url);
+    state = States.CONNECTING;
+    callOnConnChange();
     ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     ws.onclose = (evt) => {
         console.error("ws.onclose:", evt);
+        state = States.CLOSED;
+        callOnConnChange();
         shutdown();
         setRetry();
     };
@@ -40,6 +61,10 @@ export function start() {
         console.error("ws.onerror:", evt);
     };
     ws.onmessage = (evt) => {
+        if (state !== States.ALIVE) {
+            state = States.ALIVE;
+            callOnConnChange();
+        }
         const arrayBuffer = evt.data;
         const view = new Uint8Array(arrayBuffer);
         var decode;
@@ -53,7 +78,9 @@ export function start() {
         handleMessage(decode);
     };
     ws.onopen = (evt) => {
-        console.log("ws.onopen:", evt);
+        console.info("ws.onopen:", evt);
+        state = States.CONNECTED;
+        callOnConnChange();
         startPings();
         const subReq = monitor_web_socket.SubscribeToMetrics.create();
         const req = monitor_web_socket.ToServer.create({ subscribeToMetrics: subReq });
@@ -80,7 +107,16 @@ function shutdown(opts) {
         }
     }
 
+    state = States.CLOSED;
+    callOnConnChange();
+
     stopPings();
+
+    // Unset onclose, onerror handlers which seem to fire (on Firefox) after we've
+    // opened a new connection, which would end up calling shutdown() and
+    // terminating the new connection.
+    ws.onclose = null;
+    ws.onerror = null;
 
     ws = null;
 }
@@ -103,6 +139,10 @@ function handleMessage(msg) {
         const m = msg.metricsUpdate;
         onUpdate(m.metrics);
     } else if (msg.pong) {
+        if (SKIP_PONGS) {
+            console.warn("Ignoring pong for debugging");
+            return;
+        }
         const pong = msg.pong;
         const ping =
             outstandingPings.find((x) => util.arraysEqual(x.payload, pong.payload));
@@ -117,6 +157,12 @@ function handleMessage(msg) {
     } else {
         console.error("ws.handleMessage unknown message: ", msg);
     }
+}
+
+function callOnConnChange() {
+    onConnChange({
+        state,
+    });
 }
 
 function startPings() {

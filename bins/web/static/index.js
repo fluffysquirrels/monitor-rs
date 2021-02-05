@@ -13,6 +13,7 @@ function indexMain() {
     vueStart();
 
     webSocket.setOnUpdate(handleUpdates);
+    webSocket.setOnConnChange((connState) => console.info("connState = ", connState));
     webSocket.start();
 }
 
