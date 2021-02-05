@@ -3,18 +3,31 @@
 ## WIP
 
 * Web front-end
+    * Show WebSocket connection status
 
 ## Bugs
 
-* `Notifier` should maybe call `NotificationHandle.close()` to avoid
+* gtk-client: `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* Redirect to login when WebSocket auth fails.
+* monitor-web: Redirect to login when WebSocket auth fails (on WebSocket error connect to a
+  `/check-auth` endpoint)
 
 ## Features
 
 * Web front-end
-    * Notifications when page is open
-    * Notifications when page is not open?
+    * Show WebSocket connection status
+    * Move notifications setup to a settings page
+    * Notifications
+        * Show number of Ok/Err metrics
+        * Show first Ok after Err
+        * When page is not open? (using Web Push API)
+        * Snooze an error (e.g. Travis build error on Rust nightly)
+        * Per-metric-name configuration
+        * Flakey metrics requiring `n` failures for a notification (use on sync)
+    * Anti-CSRF
+    * Force check
+    * Search for metrics that contain a string
+    * Show logs
     * Authentication
         * Track login time?
         * Test expired sessions.
@@ -22,8 +35,6 @@
           or out of process in-memory store later)
             * This is a big old memory leak right now. Enforce one session per user?
         * Refresh sessions near their expiry? (50% towards expiry?)
-    * Anti-CSRF
-    * Show count of checks
 * Show count of checks that are not yet set (no .latest) in summary line?
 * View checks filtered by containing a string.
 * Add hyperlinks to show logs / status. E.g. Travis checks, jellyfin
