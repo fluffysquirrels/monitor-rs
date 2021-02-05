@@ -9,13 +9,14 @@
 
 * gtk-client: `Notifier` should maybe call `NotificationHandle.close()` to avoid
   consuming all the notification slots.
-* monitor-web: Redirect to login when WebSocket auth fails (on WebSocket error connect to a
-  `/check-auth` endpoint)
+* monitor-web: Redirect to login when WebSocket auth fails
+  (on WebSocket error connect to a `/check-auth` endpoint)
 
 ## Features
 
 * Web front-end
     * Show WebSocket connection status
+    * Alert on WebSocket connection status
     * Move notifications setup to a settings page
     * Notifications
         * Show number of Ok/Err metrics
@@ -28,6 +29,12 @@
     * Force check
     * Search for metrics that contain a string
     * Show logs
+    * Fix flicker of content on start
+        * Show a spinner instead of HTML values?
+        * Don't hide HTML values until we get an initial set of data?
+    * prod build
+        * Minimise .js
+        * Use vue prod build
     * Authentication
         * Track login time?
         * Test expired sessions.
