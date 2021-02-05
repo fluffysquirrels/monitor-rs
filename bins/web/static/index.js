@@ -13,7 +13,10 @@ function indexMain() {
     vueStart();
 
     webSocket.setOnUpdate(handleUpdates);
-    webSocket.setOnConnChange((connState) => console.info("connState = ", connState));
+    webSocket.setOnConnStatusChange((connStatus) => {
+        console.info("connStatus = ", connStatus);
+        vueApp.connStatus = connStatus;
+    });
     webSocket.start();
 }
 
@@ -65,6 +68,10 @@ function vueStart() {
                 showAskNotificationPermission:
                     _webNotifier.permission() === "default",
                 notificationStatus: _webNotifier.permission(),
+
+                connStatus: {
+                    state: webSocket.States.UNINITIALISED,
+                },
             };
         },
         computed: {

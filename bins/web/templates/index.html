@@ -45,6 +45,10 @@
           You need to use your browser to enable them again
         </span>
       </div>
+      <div>
+        <span>Connection status: </span>
+        <em v-text="connStatus.state"></em>
+      </div>
       <div id="summary">
         <span class="metric-value-Ok">
           <span v-text="metricsNumOk"></span>

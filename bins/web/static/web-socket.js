@@ -4,7 +4,7 @@ import * as util from "/static/util.js";
 
 const monitor_web_socket = protobuf.roots["default"].monitor_web_socket;
 
-const States = {
+export const States = {
     CONNECTING: "connecting",
     CONNECTED: "connected, pending data",
     ALIVE: "alive",
@@ -14,7 +14,7 @@ const States = {
 let ws = null;
 let pingIntervalTimeout = null;
 let onUpdate = (metrics) => {};
-let onConnChange = (connState) => {};
+let onConnStatusChange = (connStatus) => {};
 let state = States.CLOSED;
 
 /// An array of { payload: Array<Number>, time: Date, timeoutId: TimeoutId }.
@@ -32,8 +32,8 @@ export function setOnUpdate(cb) {
     onUpdate = cb;
 }
 
-export function setOnConnChange(cb) {
-    onConnChange = cb;
+export function setOnConnStatusChange(cb) {
+    onConnStatusChange = cb;
 }
 
 export function start() {
@@ -47,13 +47,13 @@ export function start() {
         window.location.hostname + ":" + window.location.port + "/ws/";
     console.info("ws.start connecting to:", url);
     state = States.CONNECTING;
-    callOnConnChange();
+    callOnConnStatusChange();
     ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
     ws.onclose = (evt) => {
         console.error("ws.onclose:", evt);
         state = States.CLOSED;
-        callOnConnChange();
+        callOnConnStatusChange();
         shutdown();
         setRetry();
     };
@@ -63,7 +63,7 @@ export function start() {
     ws.onmessage = (evt) => {
         if (state !== States.ALIVE) {
             state = States.ALIVE;
-            callOnConnChange();
+            callOnConnStatusChange();
         }
         const arrayBuffer = evt.data;
         const view = new Uint8Array(arrayBuffer);
@@ -80,7 +80,7 @@ export function start() {
     ws.onopen = (evt) => {
         console.info("ws.onopen:", evt);
         state = States.CONNECTED;
-        callOnConnChange();
+        callOnConnStatusChange();
         startPings();
         const subReq = monitor_web_socket.SubscribeToMetrics.create();
         const req = monitor_web_socket.ToServer.create({ subscribeToMetrics: subReq });
@@ -108,7 +108,7 @@ function shutdown(opts) {
     }
 
     state = States.CLOSED;
-    callOnConnChange();
+    callOnConnStatusChange();
 
     stopPings();
 
@@ -159,8 +159,8 @@ function handleMessage(msg) {
     }
 }
 
-function callOnConnChange() {
-    onConnChange({
+function callOnConnStatusChange() {
+    onConnStatusChange({
         state,
     });
 }

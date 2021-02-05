@@ -3,7 +3,6 @@
 ## WIP
 
 * Web front-end
-    * Show WebSocket connection status
 
 ## Bugs
 
@@ -15,7 +14,6 @@
 ## Features
 
 * Web front-end
-    * Show WebSocket connection status
     * Alert on WebSocket connection status
     * Move notifications setup to a settings page
     * Notifications
