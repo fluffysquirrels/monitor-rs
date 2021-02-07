@@ -64,6 +64,7 @@
         <div v-for="metric in metrics" v-bind:key="metric.metricKey" class="metric">
           <span v-bind:class="['metric-value', 'metric-value-' + (metric.ok ? 'Ok' : 'Err')]"
                 v-text="metric.value"></span>
+          <span class="metric-log" v-bind:title="'Log:\n' + metric.log.log">L</span>
           <span class="metric-name" v-text="metric.metricKey"></span>
         </div>
       </div>

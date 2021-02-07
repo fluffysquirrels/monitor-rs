@@ -8,7 +8,8 @@ use crate::{
 };
 use monitor::{
     Continue,
-    metric_store::{Metric},
+    log_store::Log,
+    metric_store::Metric,
     monitor_core_types,
 };
 use prost::Message;
@@ -64,7 +65,7 @@ impl actix::StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketA
         msg: Result<ws::Message, ws::ProtocolError>,
         ctx: &mut Self::Context,
     ) {
-        let log_ctx = format!("WSA peer={}", self.peer_addr);
+        let log_ctx = self.log_ctx();
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Binary(bin)) => {
@@ -89,46 +90,13 @@ impl actix::StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketA
     }
 }
 
-struct MetricUpdateMessage {
-    metric: Metric,
-}
-
-impl actix::Message for MetricUpdateMessage {
-    type Result = ();
-}
-
-impl actix::Handler<MetricUpdateMessage> for WebSocketActor {
-    type Result = ();
-    fn handle(&mut self, msg: MetricUpdateMessage, ctx: &mut Self::Context) -> Self::Result {
-        let log_ctx = format!("WSA peer={}", self.peer_addr);
-
-        let m_proto = match msg.metric.to_remote(&self.ctx.config.host_name) {
-            Ok(p) => p,
-            Err(e) => {
-                error!("{} Error encoding Metric to protobuf: {}", log_ctx, e);
-                return;
-            }
-        };
-        let ws_msg = web_socket_types::ToClient {
-            msg: Some(web_socket_types::to_client::Msg::MetricsUpdate(
-                web_socket_types::MetricsUpdate {
-                    metrics: vec![m_proto],
-                })),
-        };
-        if let Err(e) = self.send(ctx, &ws_msg) {
-            error!("{} Error sending MetricsUpdate: {}", log_ctx, e);
-            return ();
-        }
-    }
-}
-
 impl WebSocketActor {
     fn handle_incoming(
         &mut self,
         msg: web_socket_types::ToServer,
         ctx: &mut ws::WebsocketContext<Self>,
     ) {
-        let log_ctx = format!("WSA peer={}", self.peer_addr);
+        let log_ctx = self.log_ctx();
         trace!("{} Incoming={:?}", log_ctx, &msg);
         let msg = match msg.msg {
             Some(msg) => msg,
@@ -145,8 +113,8 @@ impl WebSocketActor {
                 let mut ms_lock = self.ctx.metric_store.lock().unwrap();
                 let log_ctxc = log_ctx.clone();
                 ms_lock.update_signal_for_all().connect(move |m| {
-                    let msg = MetricUpdateMessage {
-                        metric: m,
+                    let msg = MetricsUpdateMessage {
+                        metrics: vec![m],
                     };
                     if let Err(e) = addr.try_send(msg) {
                         use actix::prelude::SendError;
@@ -187,6 +155,54 @@ impl WebSocketActor {
                     return;
                 }
             },
+            web_socket_types::to_server::Msg::SubscribeToLogs(_sub) => {
+                let addr = ctx.address();
+
+                let mut ls_lock = self.ctx.log_store.lock().unwrap();
+                let log_ctxc = log_ctx.clone();
+                ls_lock.update_signal().connect(move |l| {
+                    let msg = LogsUpdateMessage {
+                        logs: vec![l],
+                    };
+                    if let Err(e) = addr.try_send(msg) {
+                        use actix::prelude::SendError;
+                        match e {
+                            SendError::Full(_msg) => {
+                                error!("{} Error sending log update message: queue full",
+                                       log_ctxc);
+                            },
+                            SendError::Closed(_msg) => {
+                                info!("{} Sending log update message: recipient closed",
+                                      log_ctxc);
+                                return Continue::Disconnect;
+                            },
+                        }
+                    }
+                    Continue::Continue
+                });
+                let logs = ls_lock.query_all().map(|l| l.clone()).collect::<Vec<Log>>();
+                drop(ls_lock);
+
+                let protos = logs.iter().map(|l| l.to_remote(&self.ctx.config.host_name))
+                                 .collect::<Result<Vec<monitor_core_types::Log>, _>>();
+                let protos = match protos {
+                    Err(e) => {
+                        error!("{} Error encoding Logs to protobuf: {}", log_ctx, e);
+                        return;
+                    }
+                    Ok(ps) => ps,
+                };
+                let msg = web_socket_types::ToClient {
+                    msg: Some(web_socket_types::to_client::Msg::LogsUpdate(
+                        web_socket_types::LogsUpdate {
+                            logs: protos,
+                        })),
+                };
+                if let Err(e) = self.send(ctx, &msg) {
+                    error!("{} Error sending LogsUpdate: {}", log_ctx, e);
+                    return;
+                }
+            }
             web_socket_types::to_server::Msg::Ping(ping) => {
                 let pong = web_socket_types::ToClient {
                     msg: Some(web_socket_types::to_client::Msg::Pong(
@@ -207,7 +223,7 @@ impl WebSocketActor {
         ctx: &mut ws::WebsocketContext<Self>,
         msg: &web_socket_types::ToClient
     ) -> Result<(), String> {
-        let log_ctx = format!("WSA peer={}", self.peer_addr);
+        let log_ctx = self.log_ctx();
         let mut buf = vec![];
         if let Err(e) = msg.encode(&mut buf) {
             let err_msg = format!("to_client::Msg encode error: {}", e);
@@ -216,5 +232,81 @@ impl WebSocketActor {
         ctx.binary(buf);
         trace!("{} Sent message to client", log_ctx);
         Ok(())
+    }
+
+    fn log_ctx(&self) -> String {
+        format!("WSA peer={}", self.peer_addr)
+    }
+}
+
+struct MetricsUpdateMessage {
+    metrics: Vec<Metric>,
+}
+
+impl actix::Message for MetricsUpdateMessage {
+    type Result = ();
+}
+
+impl actix::Handler<MetricsUpdateMessage> for WebSocketActor {
+    type Result = ();
+    fn handle(&mut self, msg: MetricsUpdateMessage, ctx: &mut Self::Context) -> Self::Result {
+        let log_ctx = self.log_ctx();
+
+        let ms_proto = msg.metrics.iter().map(|m| m.to_remote(&self.ctx.config.host_name))
+                         .collect::<Result<Vec<monitor_core_types::Metric>, _>>();
+        let ms_proto = match ms_proto {
+            Ok(p) => p,
+            Err(e) => {
+                error!("{} Error encoding Metric to protobuf: {}", log_ctx, e);
+                return ();
+            }
+        };
+        let ws_msg = web_socket_types::ToClient {
+            msg: Some(web_socket_types::to_client::Msg::MetricsUpdate(
+                web_socket_types::MetricsUpdate {
+                    metrics: ms_proto,
+                })),
+        };
+        if let Err(e) = self.send(ctx, &ws_msg) {
+            error!("{} Error sending MetricsUpdate: {}", log_ctx, e);
+            return ();
+        }
+        ()
+    }
+}
+
+struct LogsUpdateMessage {
+    logs: Vec<Log>,
+}
+
+impl actix::Message for LogsUpdateMessage {
+    type Result = ();
+}
+
+impl actix::Handler<LogsUpdateMessage> for WebSocketActor {
+    type Result = ();
+    fn handle(&mut self, msg: LogsUpdateMessage, ctx: &mut Self::Context) -> Self::Result {
+        let log_ctx = self.log_ctx();
+
+        let ms_proto = msg.logs.iter().map(|l| l.to_remote(&self.ctx.config.host_name))
+                          .collect::<Result<Vec<monitor_core_types::Log>, _>>();
+        let ms_proto = match ms_proto {
+            Ok(p) => p,
+            Err(e) => {
+                error!("{} Error encoding Log to protobuf: {}", log_ctx, e);
+                return ();
+            }
+        };
+        let ws_msg = web_socket_types::ToClient {
+            msg: Some(web_socket_types::to_client::Msg::LogsUpdate(
+                web_socket_types::LogsUpdate {
+                    logs: ms_proto,
+                })),
+        };
+        if let Err(e) = self.send(ctx, &ws_msg) {
+            error!("{} Error sending LogsUpdate: {}", log_ctx, e);
+            return ();
+        }
+        ()
     }
 }

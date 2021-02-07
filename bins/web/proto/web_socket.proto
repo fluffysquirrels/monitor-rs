@@ -11,10 +11,13 @@ message ToServer {
   oneof msg {
     SubscribeToMetrics subscribeToMetrics = 2;
     Ping ping = 3;
+    SubscribeToLogs subscribeToLogs = 4;
   }
 }
 
 message SubscribeToMetrics {}
+
+message SubscribeToLogs {}
 
 message Ping {
   bytes payload = 1;
@@ -27,6 +30,7 @@ message ToClient {
   oneof msg {
     MetricsUpdate metricsUpdate = 4;
     Pong pong = 3;
+    LogsUpdate logsUpdate = 5;
   }
 }
 
@@ -36,4 +40,8 @@ message MetricsUpdate {
 
 message Pong {
   bytes payload = 1;
+}
+
+message LogsUpdate {
+  repeated monitor_core_types.Log logs = 1;
 }

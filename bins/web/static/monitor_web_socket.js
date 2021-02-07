@@ -25,6 +25,7 @@
              * @interface IToServer
              * @property {monitor_web_socket.ISubscribeToMetrics|null} [subscribeToMetrics] ToServer subscribeToMetrics
              * @property {monitor_web_socket.IPing|null} [ping] ToServer ping
+             * @property {monitor_web_socket.ISubscribeToLogs|null} [subscribeToLogs] ToServer subscribeToLogs
              */
     
             /**
@@ -58,17 +59,25 @@
              */
             ToServer.prototype.ping = null;
     
+            /**
+             * ToServer subscribeToLogs.
+             * @member {monitor_web_socket.ISubscribeToLogs|null|undefined} subscribeToLogs
+             * @memberof monitor_web_socket.ToServer
+             * @instance
+             */
+            ToServer.prototype.subscribeToLogs = null;
+    
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
     
             /**
              * ToServer msg.
-             * @member {"subscribeToMetrics"|"ping"|undefined} msg
+             * @member {"subscribeToMetrics"|"ping"|"subscribeToLogs"|undefined} msg
              * @memberof monitor_web_socket.ToServer
              * @instance
              */
             Object.defineProperty(ToServer.prototype, "msg", {
-                get: $util.oneOfGetter($oneOfFields = ["subscribeToMetrics", "ping"]),
+                get: $util.oneOfGetter($oneOfFields = ["subscribeToMetrics", "ping", "subscribeToLogs"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
     
@@ -100,6 +109,8 @@
                     $root.monitor_web_socket.SubscribeToMetrics.encode(message.subscribeToMetrics, writer.uint32(/* id 2, wireType 2 =*/18).fork()).ldelim();
                 if (message.ping != null && Object.hasOwnProperty.call(message, "ping"))
                     $root.monitor_web_socket.Ping.encode(message.ping, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
+                if (message.subscribeToLogs != null && Object.hasOwnProperty.call(message, "subscribeToLogs"))
+                    $root.monitor_web_socket.SubscribeToLogs.encode(message.subscribeToLogs, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
                 return writer;
             };
     
@@ -139,6 +150,9 @@
                         break;
                     case 3:
                         message.ping = $root.monitor_web_socket.Ping.decode(reader, reader.uint32());
+                        break;
+                    case 4:
+                        message.subscribeToLogs = $root.monitor_web_socket.SubscribeToLogs.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -194,6 +208,16 @@
                             return "ping." + error;
                     }
                 }
+                if (message.subscribeToLogs != null && message.hasOwnProperty("subscribeToLogs")) {
+                    if (properties.msg === 1)
+                        return "msg: multiple values";
+                    properties.msg = 1;
+                    {
+                        var error = $root.monitor_web_socket.SubscribeToLogs.verify(message.subscribeToLogs);
+                        if (error)
+                            return "subscribeToLogs." + error;
+                    }
+                }
                 return null;
             };
     
@@ -218,6 +242,11 @@
                     if (typeof object.ping !== "object")
                         throw TypeError(".monitor_web_socket.ToServer.ping: object expected");
                     message.ping = $root.monitor_web_socket.Ping.fromObject(object.ping);
+                }
+                if (object.subscribeToLogs != null) {
+                    if (typeof object.subscribeToLogs !== "object")
+                        throw TypeError(".monitor_web_socket.ToServer.subscribeToLogs: object expected");
+                    message.subscribeToLogs = $root.monitor_web_socket.SubscribeToLogs.fromObject(object.subscribeToLogs);
                 }
                 return message;
             };
@@ -244,6 +273,11 @@
                     object.ping = $root.monitor_web_socket.Ping.toObject(message.ping, options);
                     if (options.oneofs)
                         object.msg = "ping";
+                }
+                if (message.subscribeToLogs != null && message.hasOwnProperty("subscribeToLogs")) {
+                    object.subscribeToLogs = $root.monitor_web_socket.SubscribeToLogs.toObject(message.subscribeToLogs, options);
+                    if (options.oneofs)
+                        object.msg = "subscribeToLogs";
                 }
                 return object;
             };
@@ -420,6 +454,166 @@
             };
     
             return SubscribeToMetrics;
+        })();
+    
+        monitor_web_socket.SubscribeToLogs = (function() {
+    
+            /**
+             * Properties of a SubscribeToLogs.
+             * @memberof monitor_web_socket
+             * @interface ISubscribeToLogs
+             */
+    
+            /**
+             * Constructs a new SubscribeToLogs.
+             * @memberof monitor_web_socket
+             * @classdesc Represents a SubscribeToLogs.
+             * @implements ISubscribeToLogs
+             * @constructor
+             * @param {monitor_web_socket.ISubscribeToLogs=} [properties] Properties to set
+             */
+            function SubscribeToLogs(properties) {
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+    
+            /**
+             * Creates a new SubscribeToLogs instance using the specified properties.
+             * @function create
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {monitor_web_socket.ISubscribeToLogs=} [properties] Properties to set
+             * @returns {monitor_web_socket.SubscribeToLogs} SubscribeToLogs instance
+             */
+            SubscribeToLogs.create = function create(properties) {
+                return new SubscribeToLogs(properties);
+            };
+    
+            /**
+             * Encodes the specified SubscribeToLogs message. Does not implicitly {@link monitor_web_socket.SubscribeToLogs.verify|verify} messages.
+             * @function encode
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {monitor_web_socket.ISubscribeToLogs} message SubscribeToLogs message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SubscribeToLogs.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                return writer;
+            };
+    
+            /**
+             * Encodes the specified SubscribeToLogs message, length delimited. Does not implicitly {@link monitor_web_socket.SubscribeToLogs.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {monitor_web_socket.ISubscribeToLogs} message SubscribeToLogs message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            SubscribeToLogs.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+    
+            /**
+             * Decodes a SubscribeToLogs message from the specified reader or buffer.
+             * @function decode
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {monitor_web_socket.SubscribeToLogs} SubscribeToLogs
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SubscribeToLogs.decode = function decode(reader, length) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.monitor_web_socket.SubscribeToLogs();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    switch (tag >>> 3) {
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Decodes a SubscribeToLogs message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {monitor_web_socket.SubscribeToLogs} SubscribeToLogs
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            SubscribeToLogs.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+    
+            /**
+             * Verifies a SubscribeToLogs message.
+             * @function verify
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            SubscribeToLogs.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                return null;
+            };
+    
+            /**
+             * Creates a SubscribeToLogs message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {monitor_web_socket.SubscribeToLogs} SubscribeToLogs
+             */
+            SubscribeToLogs.fromObject = function fromObject(object) {
+                if (object instanceof $root.monitor_web_socket.SubscribeToLogs)
+                    return object;
+                return new $root.monitor_web_socket.SubscribeToLogs();
+            };
+    
+            /**
+             * Creates a plain object from a SubscribeToLogs message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @static
+             * @param {monitor_web_socket.SubscribeToLogs} message SubscribeToLogs
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            SubscribeToLogs.toObject = function toObject() {
+                return {};
+            };
+    
+            /**
+             * Converts this SubscribeToLogs to JSON.
+             * @function toJSON
+             * @memberof monitor_web_socket.SubscribeToLogs
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            SubscribeToLogs.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+    
+            return SubscribeToLogs;
         })();
     
         monitor_web_socket.Ping = (function() {
@@ -626,6 +820,7 @@
              * @interface IToClient
              * @property {monitor_web_socket.IMetricsUpdate|null} [metricsUpdate] ToClient metricsUpdate
              * @property {monitor_web_socket.IPong|null} [pong] ToClient pong
+             * @property {monitor_web_socket.ILogsUpdate|null} [logsUpdate] ToClient logsUpdate
              */
     
             /**
@@ -659,17 +854,25 @@
              */
             ToClient.prototype.pong = null;
     
+            /**
+             * ToClient logsUpdate.
+             * @member {monitor_web_socket.ILogsUpdate|null|undefined} logsUpdate
+             * @memberof monitor_web_socket.ToClient
+             * @instance
+             */
+            ToClient.prototype.logsUpdate = null;
+    
             // OneOf field names bound to virtual getters and setters
             var $oneOfFields;
     
             /**
              * ToClient msg.
-             * @member {"metricsUpdate"|"pong"|undefined} msg
+             * @member {"metricsUpdate"|"pong"|"logsUpdate"|undefined} msg
              * @memberof monitor_web_socket.ToClient
              * @instance
              */
             Object.defineProperty(ToClient.prototype, "msg", {
-                get: $util.oneOfGetter($oneOfFields = ["metricsUpdate", "pong"]),
+                get: $util.oneOfGetter($oneOfFields = ["metricsUpdate", "pong", "logsUpdate"]),
                 set: $util.oneOfSetter($oneOfFields)
             });
     
@@ -701,6 +904,8 @@
                     $root.monitor_web_socket.Pong.encode(message.pong, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
                 if (message.metricsUpdate != null && Object.hasOwnProperty.call(message, "metricsUpdate"))
                     $root.monitor_web_socket.MetricsUpdate.encode(message.metricsUpdate, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+                if (message.logsUpdate != null && Object.hasOwnProperty.call(message, "logsUpdate"))
+                    $root.monitor_web_socket.LogsUpdate.encode(message.logsUpdate, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
                 return writer;
             };
     
@@ -740,6 +945,9 @@
                         break;
                     case 3:
                         message.pong = $root.monitor_web_socket.Pong.decode(reader, reader.uint32());
+                        break;
+                    case 5:
+                        message.logsUpdate = $root.monitor_web_socket.LogsUpdate.decode(reader, reader.uint32());
                         break;
                     default:
                         reader.skipType(tag & 7);
@@ -795,6 +1003,16 @@
                             return "pong." + error;
                     }
                 }
+                if (message.logsUpdate != null && message.hasOwnProperty("logsUpdate")) {
+                    if (properties.msg === 1)
+                        return "msg: multiple values";
+                    properties.msg = 1;
+                    {
+                        var error = $root.monitor_web_socket.LogsUpdate.verify(message.logsUpdate);
+                        if (error)
+                            return "logsUpdate." + error;
+                    }
+                }
                 return null;
             };
     
@@ -819,6 +1037,11 @@
                     if (typeof object.pong !== "object")
                         throw TypeError(".monitor_web_socket.ToClient.pong: object expected");
                     message.pong = $root.monitor_web_socket.Pong.fromObject(object.pong);
+                }
+                if (object.logsUpdate != null) {
+                    if (typeof object.logsUpdate !== "object")
+                        throw TypeError(".monitor_web_socket.ToClient.logsUpdate: object expected");
+                    message.logsUpdate = $root.monitor_web_socket.LogsUpdate.fromObject(object.logsUpdate);
                 }
                 return message;
             };
@@ -845,6 +1068,11 @@
                     object.metricsUpdate = $root.monitor_web_socket.MetricsUpdate.toObject(message.metricsUpdate, options);
                     if (options.oneofs)
                         object.msg = "metricsUpdate";
+                }
+                if (message.logsUpdate != null && message.hasOwnProperty("logsUpdate")) {
+                    object.logsUpdate = $root.monitor_web_socket.LogsUpdate.toObject(message.logsUpdate, options);
+                    if (options.oneofs)
+                        object.msg = "logsUpdate";
                 }
                 return object;
             };
@@ -1265,6 +1493,214 @@
             };
     
             return Pong;
+        })();
+    
+        monitor_web_socket.LogsUpdate = (function() {
+    
+            /**
+             * Properties of a LogsUpdate.
+             * @memberof monitor_web_socket
+             * @interface ILogsUpdate
+             * @property {Array.<monitor_core_types.ILog>|null} [logs] LogsUpdate logs
+             */
+    
+            /**
+             * Constructs a new LogsUpdate.
+             * @memberof monitor_web_socket
+             * @classdesc Represents a LogsUpdate.
+             * @implements ILogsUpdate
+             * @constructor
+             * @param {monitor_web_socket.ILogsUpdate=} [properties] Properties to set
+             */
+            function LogsUpdate(properties) {
+                this.logs = [];
+                if (properties)
+                    for (var keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                        if (properties[keys[i]] != null)
+                            this[keys[i]] = properties[keys[i]];
+            }
+    
+            /**
+             * LogsUpdate logs.
+             * @member {Array.<monitor_core_types.ILog>} logs
+             * @memberof monitor_web_socket.LogsUpdate
+             * @instance
+             */
+            LogsUpdate.prototype.logs = $util.emptyArray;
+    
+            /**
+             * Creates a new LogsUpdate instance using the specified properties.
+             * @function create
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {monitor_web_socket.ILogsUpdate=} [properties] Properties to set
+             * @returns {monitor_web_socket.LogsUpdate} LogsUpdate instance
+             */
+            LogsUpdate.create = function create(properties) {
+                return new LogsUpdate(properties);
+            };
+    
+            /**
+             * Encodes the specified LogsUpdate message. Does not implicitly {@link monitor_web_socket.LogsUpdate.verify|verify} messages.
+             * @function encode
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {monitor_web_socket.ILogsUpdate} message LogsUpdate message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LogsUpdate.encode = function encode(message, writer) {
+                if (!writer)
+                    writer = $Writer.create();
+                if (message.logs != null && message.logs.length)
+                    for (var i = 0; i < message.logs.length; ++i)
+                        $root.monitor_core_types.Log.encode(message.logs[i], writer.uint32(/* id 1, wireType 2 =*/10).fork()).ldelim();
+                return writer;
+            };
+    
+            /**
+             * Encodes the specified LogsUpdate message, length delimited. Does not implicitly {@link monitor_web_socket.LogsUpdate.verify|verify} messages.
+             * @function encodeDelimited
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {monitor_web_socket.ILogsUpdate} message LogsUpdate message or plain object to encode
+             * @param {$protobuf.Writer} [writer] Writer to encode to
+             * @returns {$protobuf.Writer} Writer
+             */
+            LogsUpdate.encodeDelimited = function encodeDelimited(message, writer) {
+                return this.encode(message, writer).ldelim();
+            };
+    
+            /**
+             * Decodes a LogsUpdate message from the specified reader or buffer.
+             * @function decode
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @param {number} [length] Message length if known beforehand
+             * @returns {monitor_web_socket.LogsUpdate} LogsUpdate
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LogsUpdate.decode = function decode(reader, length) {
+                if (!(reader instanceof $Reader))
+                    reader = $Reader.create(reader);
+                var end = length === undefined ? reader.len : reader.pos + length, message = new $root.monitor_web_socket.LogsUpdate();
+                while (reader.pos < end) {
+                    var tag = reader.uint32();
+                    switch (tag >>> 3) {
+                    case 1:
+                        if (!(message.logs && message.logs.length))
+                            message.logs = [];
+                        message.logs.push($root.monitor_core_types.Log.decode(reader, reader.uint32()));
+                        break;
+                    default:
+                        reader.skipType(tag & 7);
+                        break;
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Decodes a LogsUpdate message from the specified reader or buffer, length delimited.
+             * @function decodeDelimited
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+             * @returns {monitor_web_socket.LogsUpdate} LogsUpdate
+             * @throws {Error} If the payload is not a reader or valid buffer
+             * @throws {$protobuf.util.ProtocolError} If required fields are missing
+             */
+            LogsUpdate.decodeDelimited = function decodeDelimited(reader) {
+                if (!(reader instanceof $Reader))
+                    reader = new $Reader(reader);
+                return this.decode(reader, reader.uint32());
+            };
+    
+            /**
+             * Verifies a LogsUpdate message.
+             * @function verify
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {Object.<string,*>} message Plain object to verify
+             * @returns {string|null} `null` if valid, otherwise the reason why it is not
+             */
+            LogsUpdate.verify = function verify(message) {
+                if (typeof message !== "object" || message === null)
+                    return "object expected";
+                if (message.logs != null && message.hasOwnProperty("logs")) {
+                    if (!Array.isArray(message.logs))
+                        return "logs: array expected";
+                    for (var i = 0; i < message.logs.length; ++i) {
+                        var error = $root.monitor_core_types.Log.verify(message.logs[i]);
+                        if (error)
+                            return "logs." + error;
+                    }
+                }
+                return null;
+            };
+    
+            /**
+             * Creates a LogsUpdate message from a plain object. Also converts values to their respective internal types.
+             * @function fromObject
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {Object.<string,*>} object Plain object
+             * @returns {monitor_web_socket.LogsUpdate} LogsUpdate
+             */
+            LogsUpdate.fromObject = function fromObject(object) {
+                if (object instanceof $root.monitor_web_socket.LogsUpdate)
+                    return object;
+                var message = new $root.monitor_web_socket.LogsUpdate();
+                if (object.logs) {
+                    if (!Array.isArray(object.logs))
+                        throw TypeError(".monitor_web_socket.LogsUpdate.logs: array expected");
+                    message.logs = [];
+                    for (var i = 0; i < object.logs.length; ++i) {
+                        if (typeof object.logs[i] !== "object")
+                            throw TypeError(".monitor_web_socket.LogsUpdate.logs: object expected");
+                        message.logs[i] = $root.monitor_core_types.Log.fromObject(object.logs[i]);
+                    }
+                }
+                return message;
+            };
+    
+            /**
+             * Creates a plain object from a LogsUpdate message. Also converts values to other types if specified.
+             * @function toObject
+             * @memberof monitor_web_socket.LogsUpdate
+             * @static
+             * @param {monitor_web_socket.LogsUpdate} message LogsUpdate
+             * @param {$protobuf.IConversionOptions} [options] Conversion options
+             * @returns {Object.<string,*>} Plain object
+             */
+            LogsUpdate.toObject = function toObject(message, options) {
+                if (!options)
+                    options = {};
+                var object = {};
+                if (options.arrays || options.defaults)
+                    object.logs = [];
+                if (message.logs && message.logs.length) {
+                    object.logs = [];
+                    for (var j = 0; j < message.logs.length; ++j)
+                        object.logs[j] = $root.monitor_core_types.Log.toObject(message.logs[j], options);
+                }
+                return object;
+            };
+    
+            /**
+             * Converts this LogsUpdate to JSON.
+             * @function toJSON
+             * @memberof monitor_web_socket.LogsUpdate
+             * @instance
+             * @returns {Object.<string,*>} JSON object
+             */
+            LogsUpdate.prototype.toJSON = function toJSON() {
+                return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+            };
+    
+            return LogsUpdate;
         })();
     
         return monitor_web_socket;

@@ -1,5 +1,7 @@
 .metric-value {
-    padding-right: 0.25em;
+    padding-right: 0.5em;
+    width: 3em;
+    display: inline-block;
 }
 
 .metric-value-missing {
@@ -12,6 +14,10 @@
 
 .metric-value-Err {
     color: #cc0000;
+}
+
+.metric-log {
+    padding-right: 0.5em;
 }
 
 #login label {

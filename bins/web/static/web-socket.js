@@ -13,7 +13,8 @@ export const States = {
 
 let ws = null;
 let pingIntervalTimeout = null;
-let onUpdate = (metrics) => {};
+let onMetricsUpdate = (metrics) => {};
+let onLogsUpdate = (logs) => {};
 let onConnStatusChange = (connStatus) => {};
 let state = States.CLOSED;
 
@@ -28,8 +29,12 @@ const CONNECTION_RETRY_INTERVAL_MS = 5  * 1000; // 5s
 /// For fault injection, ignore pongs.
 const SKIP_PONGS = false;
 
-export function setOnUpdate(cb) {
-    onUpdate = cb;
+export function setOnMetricsUpdate(cb) {
+    onMetricsUpdate = cb;
+}
+
+export function setOnLogsUpdate(cb) {
+    onLogsUpdate = cb;
 }
 
 export function setOnConnStatusChange(cb) {
@@ -82,9 +87,18 @@ export function start() {
         state = States.CONNECTED;
         callOnConnStatusChange();
         startPings();
-        const subReq = monitor_web_socket.SubscribeToMetrics.create();
-        const req = monitor_web_socket.ToServer.create({ subscribeToMetrics: subReq });
-        send(req);
+
+        const metricsSubReq = monitor_web_socket.SubscribeToMetrics.create();
+        const metricsReq = monitor_web_socket.ToServer.create({
+            subscribeToMetrics: metricsSubReq
+        });
+        send(metricsReq);
+
+        const logsSubReq = monitor_web_socket.SubscribeToLogs.create();
+        const logsReq = monitor_web_socket.ToServer.create({
+            subscribeToLogs: logsSubReq
+        });
+        send(logsReq);
     };
 }
 
@@ -137,7 +151,11 @@ function send(msg) {
 function handleMessage(msg) {
     if (msg.metricsUpdate) {
         const m = msg.metricsUpdate;
-        onUpdate(m.metrics);
+        onMetricsUpdate(m.metrics);
+    }
+    else if (msg.logsUpdate) {
+        const m = msg.logsUpdate;
+        onLogsUpdate(m.logs);
     } else if (msg.pong) {
         if (SKIP_PONGS) {
             console.warn("Ignoring pong for debugging");

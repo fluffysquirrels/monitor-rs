@@ -12,7 +12,8 @@ function indexMain() {
     _webNotifier = webNotifier.create();
     vueStart();
 
-    webSocket.setOnUpdate(handleUpdates);
+    webSocket.setOnMetricsUpdate(handleMetricsUpdate);
+    webSocket.setOnLogsUpdate(handleLogsUpdate);
     webSocket.setOnConnStatusChange((connStatus) => {
         console.info("connStatus = ", connStatus);
         vueApp.connStatus = connStatus;
@@ -20,13 +21,13 @@ function indexMain() {
     webSocket.start();
 }
 
-function handleUpdates(metrics) {
-    console.debug("handleUpdates len = ", metrics.length);
+function handleMetricsUpdate(metrics) {
+    console.debug("handleMetricsUpdate len = ", metrics.length);
     if (vueApp === null) {
         return;
     }
     for (const metric of metrics) {
-        const displayKey = metric.key.name + "@" + metric.key.fromHost.name;
+        const displayKey = protoKeyToDisplayKey(metric.key);
         let displayValue = null;
         if (metric.latest.none) {
             displayValue = metric.latest.ok ? "Ok": "Err";
@@ -42,8 +43,7 @@ function handleUpdates(metrics) {
             value: displayValue,
         };
 
-        // TODO: Would be nice if this were O(1) somehow using a map.
-        const existing = vueApp.metrics.find(vm => vm.metricKey === displayKey);
+        const existing = findVueMetric(displayKey);
         if (existing) {
             existing.ok = o.ok;
             existing.value = o.value;
@@ -59,10 +59,38 @@ function handleUpdates(metrics) {
     }
 }
 
+function handleLogsUpdate(logs) {
+    console.debug("handleLogsUpdate len = ", logs.length);
+    // TODO.
+    for (const log of logs) {
+        const displayKey = protoKeyToDisplayKey(log.key);
+        const existing = findVueMetric(displayKey);
+        if (!existing) {
+            continue;
+        }
+        existing.log = log;
+    }
+}
+
+// TODO: Would be nice if this were O(1) somehow using a map.
+function findVueMetric(metricKey) {
+    return vueApp.metrics.find(vm => vm.metricKey === metricKey);
+}
+
+function protoKeyToDisplayKey(protoKey) {
+    return protoKey.name + "@" + protoKey.fromHost.name;
+}
+
 function vueStart() {
     const app = {
         data() {
             return {
+                // Type of metrics is Array<
+                //     metricKey: String,
+                //     ok: Bool,
+                //     value: String,
+                //     log: monitor_core_types.Log,
+                // >
                 metrics: [],
 
                 showAskNotificationPermission:
