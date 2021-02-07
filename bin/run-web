@@ -8,4 +8,4 @@ cd "${package_dir}";
 
 bin/build-web;
 
-cargo run --release --package web;
+target/release/web;
